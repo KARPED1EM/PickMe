@@ -20,7 +20,7 @@ Built with [Flask](https://flask.palletsprojects.com/) + `pywebview`.
 - Install dependencies:
 
 ```bash
-  pip install -r requirements.txt
+pip install -r requirements.txt
 ````
 
 ---
@@ -46,13 +46,13 @@ pyinstaller start.pyw --onefile --noconsole --name PickMe --icon "icon.ico" \
 
 ## 📁 Data
 
-* On first launch, the app creates a `students_data.json` file automatically.
-* If `app/data/students_data.json` exists, it’s used as the initial dataset.
-* Default cooldown: `3 days`.
-* To prefill data:
+- On first launch, the app creates a `students_data.json` file automatically.
+- If `app/data/students_data.json` exists, it’s used as the initial dataset.
+- Default cooldown: `3 days`.
+- To prefill data:
 
-  * Edit `app/data/students_data.json` before build, **or**
-  * Create `students_data.json` in the user data directory.
+- Edit `app/data/students_data.json` before build, **or**
+- Create `students_data.json` in the user data directory.
 
 | OS      | Path Example                           |
 | ------- | -------------------------------------- |
