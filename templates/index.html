@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pick Me</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/icon.svg') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="app-body">
+<div class="app-backdrop"></div>
+<main class="app-main container-xxl px-3 px-lg-4 py-4">
+    <section class="glass result-card p-4">
+        <div class="result-header">
+            <div class="result-primary">
+                <span class="result-label">抽取结果</span>
+                <div id="result-name" class="result-name">--</div>
+                <div id="result-note" class="result-note">等待抽取</div>
+            </div>
+            <div class="result-stats">
+                <div class="result-stat">
+                    <span class="result-stat-label">总人数</span>
+                    <span id="stat-total" class="result-stat-value">0</span>
+                </div>
+                <div class="result-stat">
+                    <span class="result-stat-label">冷却中</span>
+                    <span id="stat-cooling" class="result-stat-value">0</span>
+                </div>
+                <div class="result-stat">
+                    <span class="result-stat-label">可抽取</span>
+                    <span id="stat-available" class="result-stat-value">0</span>
+                </div>
+            </div>
+        </div>
+        <div class="result-controls">
+            <div class="form-check form-switch ignore-switch">
+                <input class="form-check-input" type="checkbox" id="ignore-cooldown">
+                <label class="form-check-label" for="ignore-cooldown">忽略冷却时间</label>
+            </div>
+            <div class="result-buttons">
+                <button id="pick-any" class="btn btn-accent">随机抽取</button>
+                <button id="pick-group" class="btn btn-outline-light">抽取小组</button>
+            </div>
+        </div>
+    </section>
+
+    <div class="app-columns">
+        <section class="list-section">
+            <div class="glass list-card p-4 h-100">
+                <div class="list-header">
+                    <div>
+                        <h2 class="list-title">全部学生</h2>
+                        <p class="list-subtitle">右键列表项可进行更多操作</p>
+                    </div>
+                    <div class="list-toolbar">
+                        <div class="search-box">
+                            <span class="search-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none">
+                                    <path d="M21 21l-4.35-4.35M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+                                </svg>
+                            </span>
+                            <input id="student-search" type="search" class="form-control" placeholder="搜索学生 / 小组" autocomplete="off">
+                        </div>
+                        <button id="add-student" class="btn btn-outline-light btn-sm toolbar-btn">添加学生</button>
+                    </div>
+                </div>
+                <ul id="student-list" class="student-list slim-scroll"></ul>
+            </div>
+        </section>
+        <section class="list-section">
+            <div class="glass list-card p-4 h-100">
+                <div class="list-header">
+                    <div>
+                        <h2 class="list-title">冷却队列</h2>
+                        <p class="list-subtitle">查看剩余冷却时间</p>
+                    </div>
+                    <div class="cooldown-toolbar">
+                        <button id="cooldown-display" type="button" class="btn btn-ghost btn-sm">
+                            冷却 <span id="cooldown-value">0</span> 天
+                        </button>
+                        <button id="clear-cooldown" class="btn btn-ghost btn-sm">清除冷却</button>
+                    </div>
+                </div>
+                <ul id="cooldown-list" class="student-list slim-scroll"></ul>
+            </div>
+        </section>
+    </div>
+</main>
+
+<div id="context-menu" class="context-menu d-none"></div>
+<div id="modal-root" class="modal-root d-none"></div>
+<div id="toast" class="toast glass text-bg-dark"></div>
+
+<script>
+    window.__APP_INITIAL_DATA__ = {{ initial_data|safe }};
+</script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,168 @@
+import json
+import uuid
+
+
+class Student:
+    def __init__(
+        self,
+        name: str,
+        group: int,
+        last_pick: float = 0.0,
+        pick_count: int = 0,
+        pick_history: list[float] | None = None,
+        student_id: str | None = None,
+    ) -> None:
+        self.__id = (student_id or str(uuid.uuid4())).strip()
+        self.__name = name.strip()
+        self.__group = max(0, self.__parse_int(group))
+        self.__last_pick = float(last_pick or 0.0)
+        self.__pick_count = self.__parse_int(pick_count)
+        self.__pick_history: list[float] = []
+        if pick_history:
+            for value in pick_history:
+                try:
+                    self.__pick_history.append(float(value))
+                except (TypeError, ValueError):
+                    continue
+        if not self.__pick_history and self.__last_pick:
+            self.__pick_history.append(self.__last_pick)
+        if self.__pick_count < len(self.__pick_history):
+            self.__pick_count = len(self.__pick_history)
+
+    @staticmethod
+    def __parse_int(value) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 0
+
+    @property
+    def student_id(self) -> str:
+        return self.__id
+
+    @property
+    def name(self) -> str:
+        return self.__name
+
+    @property
+    def group(self) -> int:
+        return self.__group
+
+    @property
+    def last_pick(self) -> float:
+        return self.__last_pick
+
+    @property
+    def pick_count(self) -> int:
+        return self.__pick_count
+
+    @property
+    def pick_history(self) -> list[float]:
+        return list(self.__pick_history)
+
+    def update(self, name: str, group: int) -> None:
+        self.__name = name.strip()
+        self.__group = max(0, self.__parse_int(group))
+
+    def set_student_id(self, value: str) -> None:
+        self.__id = str(value or "").strip()
+
+    def pickable(
+        self, current_time: float, cooldown: int, ignore_cooldown: bool = False
+    ) -> bool:
+        if ignore_cooldown:
+            return True
+        if self.__last_pick == 0.0:
+            return True
+        return current_time - self.__last_pick >= cooldown * 60 * 60 * 24
+
+    def pick_cooldown_remaining(self, current_time: float, cooldown: int) -> float:
+        if self.__last_pick == 0.0:
+            return 0.0
+        return max(0.0, (self.__last_pick + cooldown * 60 * 60 * 24) - current_time)
+
+    def set_last_pick(self, timestamp: float) -> None:
+        self.__last_pick = float(timestamp)
+
+    def force_pickable(self) -> None:
+        self.__last_pick = 0.0
+
+    def clear_history(self) -> None:
+        self.__pick_history.clear()
+        self.__pick_count = 0
+        self.__last_pick = 0.0
+
+    def remove_history_entry(self, timestamp: float, tolerance: float = 1e-6) -> bool:
+        try:
+            target = float(timestamp)
+        except (TypeError, ValueError):
+            return False
+        index = None
+        for position, value in enumerate(self.__pick_history):
+            if abs(value - target) <= tolerance:
+                index = position
+                break
+        if index is None:
+            return False
+        self.__pick_history.pop(index)
+        if self.__pick_history:
+            self.__last_pick = max(self.__pick_history)
+        else:
+            self.__last_pick = 0.0
+        self.__pick_count = len(self.__pick_history)
+        return True
+
+    def register_pick(self, timestamp: float) -> None:
+        value = float(timestamp)
+        self.__last_pick = value
+        self.__pick_count += 1
+        self.__pick_history.append(value)
+
+    def to_dict(self, current_time: float, cooldown: int) -> dict:
+        return {
+            "id": self.__id,
+            "name": self.__name,
+            "group": self.__group,
+            "last_pick": self.__last_pick,
+            "remaining_cooldown": self.pick_cooldown_remaining(current_time, cooldown),
+            "pick_count": self.__pick_count,
+            "pick_history": list(self.__pick_history),
+        }
+
+    def serialize(self) -> dict:
+        return {
+            "id": self.__id,
+            "name": self.__name,
+            "group": self.__group,
+            "last_pick": self.__last_pick,
+            "pick_count": self.__pick_count,
+            "pick_history": list(self.__pick_history),
+        }
+
+    @staticmethod
+    def deserialize(data) -> "Student":
+        if isinstance(data, str):
+            obj = json.loads(data)
+        else:
+            obj = data
+        try:
+            group_value = int(obj.get("group", 0))
+        except (TypeError, ValueError):
+            group_value = 0
+        pick_history = obj.get("pick_history")
+        if not isinstance(pick_history, list):
+            pick_history = []
+        pick_count = obj.get("pick_count")
+        try:
+            pick_count_value = int(pick_count)
+        except (TypeError, ValueError):
+            pick_count_value = 0
+        name_value = str(obj.get("name", "")).strip()
+        return Student(
+            student_id=obj.get("id"),
+            name=name_value,
+            group=group_value,
+            last_pick=obj.get("last_pick", 0.0),
+            pick_count=pick_count_value,
+            pick_history=pick_history,
+        )
