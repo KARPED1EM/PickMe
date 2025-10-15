@@ -91,6 +91,9 @@
 <div id="context-menu" class="context-menu d-none"></div>
 <div id="modal-root" class="modal-root d-none"></div>
 <div id="toast" class="toast glass text-bg-dark"></div>
+<div class="user-data-path" title="{{ user_data_path }}">
+    数据存储路径：<span>{{ user_data_path }}</span>
+</div>
 
 <script>
     window.__APP_INITIAL_DATA__ = {{ initial_data|safe }};

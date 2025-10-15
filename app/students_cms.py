@@ -1,7 +1,7 @@
 import json
 import time
 
-from student import Student
+from .student import Student
 
 
 class StudentsCms:

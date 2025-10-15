@@ -826,6 +826,29 @@ textarea::-webkit-input-placeholder {
     opacity: 1;
     transform: translateX(-50%) translateY(-6px);
 }
+.user-data-path {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    color: rgba(221, 230, 255, 0.75);
+    background: rgba(24, 28, 46, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(12px);
+    max-width: min(70vw, 520px);
+    white-space: normal;
+    word-break: break-all;
+}
+.user-data-path span {
+    color: rgba(221, 230, 255, 0.85);
+    user-select: text;
+}
+.user-data-path:hover {
+    color: rgba(221, 230, 255, 0.88);
+    background: rgba(24, 28, 46, 0.75);
+}
 
 body.modal-open {
     overflow: hidden;
