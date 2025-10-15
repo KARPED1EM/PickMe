@@ -37,10 +37,11 @@ class DataManager:
     @classmethod
     def get_students_data(cls) -> str:
         path = cls.data_file()
+        raw = path.read_bytes()
         try:
-            return path.read_text(encoding="utf-8")
+            return raw.decode("utf-8-sig")
         except UnicodeDecodeError:
-            return path.read_text(encoding="utf-8-sig")
+            return raw.decode("utf-8")
 
     @classmethod
     def save_students_data(cls, data: str) -> None:
