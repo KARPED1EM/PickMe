@@ -1,4 +1,4 @@
-const $ = id => document.getElementById(id);
+﻿const $ = id => document.getElementById(id);
 
 const dom = {
   statTotal: $("stat-total"),
