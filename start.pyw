@@ -75,8 +75,8 @@ def main() -> None:
     window = webview.create_window(
         "Pick Me",
         url=f"http://{host}:{port}",
-        width=1200,
-        height=800,
+        width=1280,
+        height=860,
         resizable=True,
     )
 
