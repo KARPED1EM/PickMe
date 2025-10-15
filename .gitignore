@@ -2,6 +2,3 @@ __pycache__/
 
 dist/
 build/
-
-app/data/*.temp
-build.txt
