@@ -1,3 +1,0 @@
-# Activate your conda env if you need
-# Change work directory to project root
-pyinstaller start.pyw --onefile --noconsole --name PickMe --icon "icon.ico" --add-data "app/templates;app/templates" --add-data "app/static;app/static" --add-data "app/data;app/data"
