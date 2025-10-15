@@ -5,7 +5,6 @@ from pathlib import Path
 
 
 class DataManager:
-    """Provide basic persistence for the students data payload."""
 
     DEFAULT_FILE = "students_data.json"
     DEFAULT_PAYLOAD = '{"cooldown_days":3,"students":[]}'
@@ -15,7 +14,6 @@ class DataManager:
 
     @classmethod
     def configure(cls, user_dir: Path, default_data_dir: Path | None = None) -> None:
-        """Prepare the persistence layer and seed data if necessary."""
         user_dir.mkdir(parents=True, exist_ok=True)
         if default_data_dir and not _directory_has_content(user_dir):
             _copy_default_data(default_data_dir, user_dir)

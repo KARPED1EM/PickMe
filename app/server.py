@@ -23,7 +23,6 @@ ERROR_TEXT = {
 
 
 def create_app(user_data_dir: Path, default_data_dir: Path | None = None) -> Flask:
-    """Instantiate the Flask application backed by the given user data directory."""
     app = Flask(__name__, static_folder="static", template_folder="templates")
     app.config["JSON_AS_ASCII"] = False
 
