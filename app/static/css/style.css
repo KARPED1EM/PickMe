@@ -44,10 +44,6 @@
         padding-bottom: 1.5rem;
         height: 100vh;
         box-sizing: border-box;
-        overflow: visible;
-    }
-    .app-columns {
-        overflow: visible;
     }
 }
 
@@ -143,16 +139,27 @@ textarea::-webkit-input-placeholder {
 .result-card::before {
     content: "";
     position: absolute;
-    inset: -18% -18% -32% -18%;
+    top: calc(-18% - 24px);
+    bottom: calc(-32% - 48px);
+    left: 0;
+    right: 0;
+    transform: scale(0.9);
+    transform-origin: center;
     background:
         radial-gradient(circle at 30% 30%, rgba(255, 65, 109, 0.32), transparent 72%),
         radial-gradient(circle at 68% 30%, rgba(114, 207, 255, 0.28), transparent 70%);
-    -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 78%, rgba(0,0,0,0) 100%);
-            mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 78%, rgba(0,0,0,0) 100%);
+    -webkit-mask-image:
+        linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 78%, rgba(0,0,0,0) 100%),
+        linear-gradient(to right,  rgba(0,0,0,0) 0%, rgba(0,0,0,1) 14%, rgba(0,0,0,1) 86%, rgba(0,0,0,0) 100%);
+            mask-image:
+        linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 78%, rgba(0,0,0,0) 100%),
+        linear-gradient(to right,  rgba(0,0,0,0) 0%, rgba(0,0,0,1) 14%, rgba(0,0,0,1) 86%, rgba(0,0,0,0) 100%);
+    -webkit-mask-composite: source-in;
+            mask-composite: intersect;
+
     -webkit-mask-repeat: no-repeat;
             mask-repeat: no-repeat;
     opacity: 0;
-    transform: scale(0.9);
     transition: opacity 0.35s ease, transform 0.35s ease;
     pointer-events: none;
     z-index: -1;
@@ -931,5 +938,3 @@ body.modal-open {
         min-width: 0;
     }
 }
-
-
