@@ -139,9 +139,10 @@ function renderStudentItem(student) {
   const cooldown = student.is_cooling
     ? `冷却 ${formatDuration(student.remaining_cooldown)}`
     : "";
-  return `<li id="student-${student.id}" class="student-item${
+  const domId = buildDomId("student", student.id);
+  return `<li id="${domId}" class="student-item${
     student.is_cooling ? " is-cooling" : ""
-  }" data-id="${student.id}" data-cooling="${
+  }" data-id="${escapeHtml(String(student.id))}" data-cooling="${
     student.is_cooling ? "1" : "0"
   }" style="--group-color:${color}">
     <div class="student-item-main">
@@ -168,7 +169,8 @@ function renderCooldownItem(student) {
   const last = student.last_pick
     ? `上次 ${formatTime(student.last_pick)}`
     : "最近人为设置";
-  return `<li id="cooling-${student.id}" class="student-item is-cooling" data-id="${student.id}" data-cooling="1" style="--group-color:${color}">
+  const domId = buildDomId("cooling", student.id);
+  return `<li id="${domId}" class="student-item is-cooling" data-id="${escapeHtml(String(student.id))}" data-cooling="1" style="--group-color:${color}">
     <div class="student-item-main">
       <div class="student-line">
         <span class="student-name">${escapeHtml(student.name)}</span>
@@ -1569,6 +1571,11 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+function buildDomId(prefix, value) {
+  const segment = encodeURIComponent(String(value));
+  return `${prefix}-${segment}`;
+}
+
 function showToast(message) {
   dom.toast.textContent = message;
   dom.toast.classList.add("show");
@@ -1577,9 +1584,6 @@ function showToast(message) {
     dom.toast.classList.remove("show");
   }, 2400);
 }
-
-
-
 
 
 

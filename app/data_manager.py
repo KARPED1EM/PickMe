@@ -1,6 +1,8 @@
 ﻿from __future__ import annotations
 
+import os
 import shutil
+import tempfile
 from pathlib import Path
 
 
@@ -20,7 +22,7 @@ class DataManager:
         cls._data_dir = user_dir
         cls._data_path = user_dir / cls.DEFAULT_FILE
         if not cls._data_path.exists():
-            cls._data_path.write_text(cls.DEFAULT_PAYLOAD, encoding="utf-8")
+            _atomic_write_text(cls._data_path, cls.DEFAULT_PAYLOAD)
 
     @classmethod
     def user_data_dir(cls) -> Path:
@@ -46,8 +48,26 @@ class DataManager:
     @classmethod
     def save_students_data(cls, data: str) -> None:
         path = cls.data_file()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(data, encoding="utf-8")
+        _atomic_write_text(path, data)
+
+
+def _atomic_write_text(path: Path, data: str, encoding: str = "utf-8") -> None:
+    directory = path.parent
+    directory.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(dir=str(directory), prefix=f".{path.name}.", suffix=".tmp")
+    temp_path = Path(temp_name)
+    try:
+        with os.fdopen(fd, "w", encoding=encoding) as temp_file:
+            temp_file.write(data)
+            temp_file.flush()
+            try:
+                os.fsync(temp_file.fileno())
+            except OSError:
+                pass
+        temp_path.replace(path)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
 
 
 def _directory_has_content(directory: Path) -> bool:
