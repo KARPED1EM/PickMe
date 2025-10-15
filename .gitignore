@@ -1,4 +1,7 @@
 __pycache__/
-app/data/*.temp
+
 dist/
 build/
+
+app/data/*.temp
+build.txt
