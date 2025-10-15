@@ -61,9 +61,12 @@ jobs:
         run: |
           if (Test-Path dist-ithm) { Remove-Item -Recurse -Force dist-ithm }
           if (Test-Path build) { Remove-Item -Recurse -Force build }
-          if (Test-Path "app/data.bak") { Remove-Item -Recurse -Force "app/data.bak" }
-          Rename-Item "app/data" "app/data.bak"
-          Copy-Item -Recurse -Force "data-ithm" "app/data"
+
+          if (Test-Path "app\data.bak") { Remove-Item -Recurse -Force "app\data.bak" }
+          Rename-Item -Path "app\data" -NewName "data.bak"
+          New-Item -ItemType Directory -Path "app\data" | Out-Null
+          Copy-Item -Recurse -Force "data-ithm\*" "app\data\"
+
           pyinstaller start.pyw --clean --onefile --noconsole `
             --name PickMe `
             --icon "icon.ico" `
@@ -71,8 +74,9 @@ jobs:
             --add-data "app/static;app/static" `
             --add-data "app/data;app/data" `
             --distpath dist-ithm
-          Remove-Item -Recurse -Force "app/data"
-          Rename-Item "app/data.bak" "app/data"
+
+          Remove-Item -Recurse -Force "app\data"
+          Rename-Item -Path "app\data.bak" -NewName "data"
 
       - name: Upload artifact exe (PickMe-ithm-win-py313-x64)
         if: matrix.arch == 'x64'
