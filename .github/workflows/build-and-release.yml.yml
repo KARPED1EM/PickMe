@@ -1,0 +1,139 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  pull_request:
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PIP_NO_PYTHON_VERSION_WARNING: "1"
+
+jobs:
+  build-amd:
+    name: Build Windows (x86/x64)
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86, x64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.13 (${{ matrix.arch }})
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: ${{ matrix.arch }}
+          cache: 'pip'
+
+      - name: Install deps
+        shell: pwsh
+        run: |
+          python -VV
+          python -c "import platform;print('Machine:', platform.machine(), 'Arch:', platform.architecture())"
+          python -m pip install --upgrade pip wheel
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller
+          pyinstaller --version
+
+      - name: Build (PyInstaller onefile GUI)
+        shell: pwsh
+        run: |
+          pyinstaller start.pyw --clean --onefile --noconsole `
+            --name PickMe `
+            --icon "icon.ico" `
+            --add-data "app/templates;app/templates" `
+            --add-data "app/static;app/static" `
+            --add-data "app/data;app/data"
+
+      - name: Package ZIP
+        shell: pwsh
+        run: |
+          $zip="PickMe-win-py313-${{ matrix.arch }}.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path "dist/*" -DestinationPath $zip
+          Write-Host "Packed $zip"
+
+      - name: Upload artifact (PickMe-win-py313-${{ matrix.arch }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: PickMe-win-py313-${{ matrix.arch }}
+          path: PickMe-win-py313-${{ matrix.arch }}.zip
+          if-no-files-found: error
+
+  build-arm64:
+    name: Build Windows (ARM64)
+    runs-on: windows-11-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.13 (arm64)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: 'arm64'
+          cache: 'pip'
+
+      - name: Install deps
+        shell: pwsh
+        run: |
+          python -VV
+          python -c "import platform;print('Machine:', platform.machine(), 'Arch:', platform.architecture())"
+          python -m pip install --upgrade pip wheel
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller
+          pyinstaller --version
+
+      - name: Build (PyInstaller onefile GUI, ARM64)
+        shell: pwsh
+        run: |
+          pyinstaller start.pyw --clean --onefile --noconsole `
+            --name PickMe `
+            --icon "icon.ico" `
+            --add-data "app/templates;app/templates" `
+            --add-data "app/static;app/static" `
+            --add-data "app/data;app/data"
+
+      - name: Package ZIP (ARM64)
+        shell: pwsh
+        run: |
+          $zip="PickMe-win-py313-arm64.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path "dist/*" -DestinationPath $zip
+          Write-Host "Packed $zip"
+
+      - name: Upload artifact (PickMe-win-py313-arm64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: PickMe-win-py313-arm64
+          path: PickMe-win-py313-arm64.zip
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: [build-amd, build-arm64]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
