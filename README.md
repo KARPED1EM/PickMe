@@ -61,7 +61,7 @@ pyinstaller scripts/desktop.pyw --clean --onefile --noconsole ^
 scripts/desktop.pyw   # WebView2 封装入口（桌面模式）
 scripts/serve.py          # FastAPI 服务启动脚本
 app/                      # FastAPI 应用、模板与静态资源
-pickme/paths.py           # 运行时路径与用户数据目录定位
+app/paths.py              # 运行时路径与用户数据目录定位
 ```
 
 

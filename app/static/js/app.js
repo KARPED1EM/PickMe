@@ -82,13 +82,19 @@ function init() {
 }
 
 function loadInitialState() {
-  if (USE_BROWSER_STORAGE) {
-    const stored = readStoredState();
-    if (stored) {
-      return stored;
-    }
+  const initial = window.__APP_INITIAL_DATA__ || {};
+  if (!USE_BROWSER_STORAGE) {
+    return initial;
   }
-  return window.__APP_INITIAL_DATA__ || {};
+  const stored = readStoredState();
+  if (hasValidStoredState(stored)) {
+    return stored;
+  }
+  if (hasValidStoredState(initial)) {
+    persistState(initial);
+    return initial;
+  }
+  return initial;
 }
 
 function readStoredState() {
@@ -108,6 +114,30 @@ function readStoredState() {
     console.warn("\u8bfb\u53d6\u6d4f\u89c8\u5668\u5b58\u6863\u5931\u8d25", error);
     return null;
   }
+}
+
+function hasValidStoredState(candidate) {
+  if (!candidate || typeof candidate !== "object") {
+    return false;
+  }
+  if (Array.isArray(candidate.classes) && candidate.classes.length > 0) {
+    return true;
+  }
+  const current = candidate.current_class;
+  if (
+    current &&
+    typeof current === "object" &&
+    current.payload &&
+    typeof current.payload === "object" &&
+    Array.isArray(current.payload.students) &&
+    current.payload.students.length > 0
+  ) {
+    return true;
+  }
+  if (Array.isArray(candidate.students) && candidate.students.length > 0) {
+    return true;
+  }
+  return false;
 }
 
 function persistState(appState) {

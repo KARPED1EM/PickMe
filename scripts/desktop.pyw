@@ -16,7 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app import create_app
-from pickme.paths import application_paths
+from app.paths import application_paths
 
 log = logging.getLogger("pickme.desktop")
 

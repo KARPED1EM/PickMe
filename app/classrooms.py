@@ -113,7 +113,9 @@ class ClassroomsState:
         classroom = self.current_class
         classroom.last_used_at = timestamp or time.time()
 
-    def rename_class(self, class_id: str, name: str, timestamp: float | None = None) -> None:
+    def rename_class(
+        self, class_id: str, name: str, timestamp: float | None = None
+    ) -> None:
         classroom = self._classes.get(class_id)
         if not classroom:
             raise KeyError("class_missing")
@@ -204,7 +206,13 @@ class ClassroomsState:
         return json.dumps(payload, ensure_ascii=False, indent=2)
 
     def _next_order_index(self) -> int:
-        return max((classroom.order_index for classroom in self._classes.values()), default=-1) + 1
+        return (
+            max(
+                (classroom.order_index for classroom in self._classes.values()),
+                default=-1,
+            )
+            + 1
+        )
 
     def _normalize_orders(self) -> None:
         for index, classroom in enumerate(self.iter_classes()):
@@ -237,7 +245,9 @@ class ClassroomsState:
         return cls._default_state()
 
     @staticmethod
-    def _coerce_payload(payload: str | dict[str, Any] | None) -> dict[str, Any] | list[Any] | None:
+    def _coerce_payload(
+        payload: str | dict[str, Any] | None,
+    ) -> dict[str, Any] | list[Any] | None:
         if payload is None:
             return None
         if isinstance(payload, str):
@@ -282,10 +292,7 @@ class ClassroomsState:
             data_blob = item.get("data")
             if data_blob is None:
                 data_blob = raw_classes_data.get(class_id)
-            if (
-                data_blob is None
-                and str(current_entry.get("id") or "") == class_id
-            ):
+            if data_blob is None and str(current_entry.get("id") or "") == class_id:
                 data_blob = current_entry.get("payload")
             cms = StudentsCms.deserialize(data_blob)
             classes[class_id] = Classroom(

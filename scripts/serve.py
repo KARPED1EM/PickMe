@@ -13,7 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app import create_app  # noqa: E402
-from pickme.paths import application_paths  # noqa: E402
+from app.paths import application_paths  # noqa: E402
 
 log = logging.getLogger("pickme.server")
 
