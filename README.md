@@ -23,7 +23,7 @@ pip install -r requirements.txt
 ```bash
 python scripts/desktop.pyw
 ```
-首次启动会在本机 `%LOCALAPPDATA%\PickMe\PickMe` 目录下生成数据文件，并自动打开 WebView2 界面。若系统未安装 WebView2，请先访问微软官方网站安装运行环境。
+首次启动会在本机 `%LOCALAPPDATA%\PickMe` 目录下生成数据文件，并自动打开 WebView2 界面。若系统未安装 WebView2，请先访问微软官方网站安装运行环境。
 
 ### 2. 服务器 / 开发模式
 ```bash
@@ -41,7 +41,7 @@ Windows 用户亦可执行 `scripts\serve.bat` 快速启动。
 
 ## 班级与数据存储
 - 首次运行会预置默认班级 **「杭州黑马 AI Python 就业 3期」**，包含示例名单，可直接体验功能。
-- 桌面模式：所有班级数据写入当前用户目录 `%LOCALAPPDATA%\PickMe\PickMe\students_data.json`。
+- 桌面模式：所有班级数据写入当前用户目录 `%LOCALAPPDATA%\PickMe\students_data.json`。
 - 服务器模式：默认写入访问者浏览器的 `localStorage`；切换浏览器或设备会得到独立的数据副本。
 - 每个班级拥有独立的学生列表、抽取历史与冷却状态；切换班级时会自动持久化当前班级的数据。
 
@@ -63,3 +63,8 @@ scripts/serve.py          # FastAPI 服务启动脚本
 app/                      # FastAPI 应用、模板与静态资源
 pickme/paths.py           # 运行时路径与用户数据目录定位
 ```
+
+
+
+
+

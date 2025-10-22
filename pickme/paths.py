@@ -16,5 +16,5 @@ def application_paths() -> tuple[Path, Path, Path]:
     if base_dir != project_root and (base_dir / "app").exists():
         package_dir = base_dir / "app"
     default_data_dir = package_dir / "data"
-    user_dir = Path(user_data_dir("PickMe", "PickMe"))
+    user_dir = Path(user_data_dir("PickMe", appauthor=False))
     return package_dir, default_data_dir, user_dir
