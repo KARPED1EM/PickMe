@@ -8,11 +8,11 @@ import sys
 import threading
 from pathlib import Path
 
-from platformdirs import user_data_dir
 import uvicorn
 
 import webview
 from app import create_app
+from pickme_bootstrap import application_paths
 
 
 log = logging.getLogger("pickme")
@@ -51,17 +51,6 @@ class AppServer(threading.Thread):
         log.info("Stopping FastAPI server")
         self._server.should_exit = True
         self._shutdown_event.wait(timeout=5)
-
-
-def application_paths() -> tuple[Path, Path, Path]:
-    base_dir = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
-    project_dir = Path(__file__).resolve().parent
-    package_dir = project_dir / "app"
-    if base_dir != project_dir and (base_dir / "app").exists():
-        package_dir = base_dir / "app"
-    default_data_dir = package_dir / "data"
-    user_dir = Path(user_data_dir("PickMe", "PickMe"))
-    return package_dir, default_data_dir, user_dir
 
 
 def message_box(text: str, title: str, flags: int = 0x00000040 | 0x00000000) -> int:

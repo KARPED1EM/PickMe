@@ -27,11 +27,20 @@ pip install -r requirements.txt
 
 ## 🛠️ Run & Build
 
-### Run (Dev)
+### Run (Desktop / WebView)
 
 ```bash
 python start.pyw
 ```
+
+### Run (Local Server)
+
+```bash
+python run_server.py --reload
+```
+
+- Double-click `run_server.py` or `run_server.bat` on Windows to start with default host/port.
+- Use the `--host` and `--port` flags to match your deployment setup (defaults to `127.0.0.1:8000`).
 
 ### Build (Single File)
 
