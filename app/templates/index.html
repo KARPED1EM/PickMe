@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8">
@@ -14,21 +14,21 @@
     <section class="glass result-card p-4">
         <div class="result-header">
             <div class="result-primary">
-                <span class="result-label">抽取结果 🎯</span>
+                <span class="result-label">&#x62BD;&#x53D6;&#x7ED3;&#x679C;</span>
                 <div id="result-name" class="result-name">--</div>
-                <div id="result-note" class="result-note">等待抽取...</div>
+                <div id="result-note" class="result-note">&#x7B49;&#x5F85;&#x62BD;&#x53D6;...</div>
             </div>
             <div class="result-stats">
                 <div class="result-stat">
-                    <span class="result-stat-label">总人数</span>
+                    <span class="result-stat-label">&#x603B;&#x4EBA;&#x6570;</span>
                     <span id="stat-total" class="result-stat-value">0</span>
                 </div>
                 <div class="result-stat">
-                    <span class="result-stat-label">冷却中</span>
+                    <span class="result-stat-label">&#x51B7;&#x5374;&#x4E2D;</span>
                     <span id="stat-cooling" class="result-stat-value">0</span>
                 </div>
                 <div class="result-stat">
-                    <span class="result-stat-label">可抽取</span>
+                    <span class="result-stat-label">&#x53EF;&#x62BD;&#x53D6;</span>
                     <span id="stat-available" class="result-stat-value">0</span>
                 </div>
             </div>
@@ -36,11 +36,11 @@
         <div class="result-controls">
             <div class="form-check form-switch ignore-switch">
                 <input class="form-check-input" type="checkbox" id="ignore-cooldown">
-                <label class="form-check-label" for="ignore-cooldown">忽略冷却时间</label>
+                <label class="form-check-label" for="ignore-cooldown">&#x5FFD;&#x7565;&#x51B7;&#x5374;&#x65F6;&#x95F4;</label>
             </div>
             <div class="result-buttons">
-                <button id="pick-any" class="btn btn-accent">随机抽取 🎲</button>
-                <button id="pick-group" class="btn btn-outline-light">抽取小组</button>
+                <button id="pick-any" class="btn btn-accent">&#x968F;&#x673A;&#x62BD;&#x4EBA;</button>
+                <button id="pick-group" class="btn btn-outline-light">&#x62BD;&#x53D6;&#x5C0F;&#x7EC4;</button>
             </div>
         </div>
     </section>
@@ -50,8 +50,8 @@
             <div class="glass list-card p-4 h-100">
                 <div class="list-header">
                     <div>
-                        <h2 class="list-title">全部学生</h2>
-                        <p class="list-subtitle">右键列表项可进行更多操作</p>
+                        <h2 class="list-title">&#x5168;&#x90E8;&#x5B66;&#x751F;</h2>
+                        <p class="list-subtitle">&#x53F3;&#x952E;&#x5217;&#x8868;&#x9879;&#x53EF;&#x4EE5;&#x5FEB;&#x901F;&#x64CD;&#x4F5C;</p>
                     </div>
                     <div class="list-toolbar">
                         <div class="search-box">
@@ -60,9 +60,9 @@
                                     <path d="M21 21l-4.35-4.35M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
                                 </svg>
                             </span>
-                            <input id="student-search" type="search" class="form-control" placeholder="搜索学生 / 小组" autocomplete="off">
+                            <input id="student-search" type="search" class="form-control" placeholder="&#x641C;&#x7D22;&#x59D3;&#x540D; / &#x5C0F;&#x7EC4;" autocomplete="off">
                         </div>
-                        <button id="add-student" class="btn btn-outline-light btn-sm toolbar-btn">添加学生 ➕</button>
+                        <button id="add-student" class="btn btn-outline-light btn-sm toolbar-btn">&#x6DFB;&#x52A0;&#x5B66;&#x751F;</button>
                     </div>
                 </div>
                 <ul id="student-list" class="student-list slim-scroll"></ul>
@@ -72,14 +72,14 @@
             <div class="glass list-card p-4 h-100">
                 <div class="list-header">
                     <div>
-                        <h2 class="list-title">冷却队列 🧊</h2>
-                        <p class="list-subtitle">查看剩余冷却时间</p>
+                        <h2 class="list-title">&#x51B7;&#x5374;&#x961F;&#x5217;</h2>
+                        <p class="list-subtitle">&#x67E5;&#x770B;&#x6BCF;&#x4F4D;&#x5B66;&#x751F;&#x7684;&#x5269;&#x4F59;&#x51B7;&#x5374;&#x65F6;&#x95F4;</p>
                     </div>
                     <div class="cooldown-toolbar">
                         <button id="cooldown-display" type="button" class="btn btn-ghost btn-sm">
-                            冷却 <span id="cooldown-value">0</span> 天
+                            &#x51B7;&#x5374; <span id="cooldown-value">0</span> &#x5929;
                         </button>
-                        <button id="clear-cooldown" class="btn btn-ghost btn-sm">清除冷却</button>
+                        <button id="clear-cooldown" class="btn btn-ghost btn-sm">&#x6E05;&#x7A7A;&#x51B7;&#x5374;</button>
                     </div>
                 </div>
                 <ul id="cooldown-list" class="student-list slim-scroll"></ul>
@@ -92,11 +92,13 @@
 <div id="modal-root" class="modal-root d-none"></div>
 <div id="toast" class="toast glass text-bg-dark"></div>
 <div class="user-data-path" title="{{ user_data_path }}">
-    数据存储路径：<span>{{ user_data_path }}</span>
+    &#x6570;&#x636E;&#x5B58;&#x50A8;&#xFF1A;<span>{{ user_data_path }}</span>
 </div>
 
 <script>
     window.__APP_INITIAL_DATA__ = {{ initial_data|safe }};
+    window.__APP_STORAGE_MODE__ = {{ storage_mode|tojson }};
+    window.__APP_STORAGE_LOCATION__ = {{ user_data_path|tojson }};
 </script>
 <script src="{{ url_for('static', path='js/app.js') }}"></script>
 </body>

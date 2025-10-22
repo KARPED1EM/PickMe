@@ -1,4 +1,4 @@
-﻿const $ = id => document.getElementById(id);
+const $ = id => document.getElementById(id);
 
 const dom = {
   statTotal: $("stat-total"),
@@ -22,8 +22,12 @@ const dom = {
   resultCard: document.querySelector(".result-card"),
 };
 
+const STORAGE_MODE = window.__APP_STORAGE_MODE__ || "filesystem";
+const USE_BROWSER_STORAGE = STORAGE_MODE === "browser";
+const STORAGE_KEY = "pickme::payload";
+
 const state = {
-  payload: normalizePayload(window.__APP_INITIAL_DATA__ || {}),
+  payload: null,
   students: [],
   studentsMap: new Map(),
   search: "",
@@ -55,9 +59,50 @@ init();
 
 function init() {
   state.ignoreCooldown = dom.ignoreCooldown.checked;
-  applyPayload(state.payload);
+  const initialPayload = loadInitialPayload();
+  applyPayload(initialPayload);
   bindEvents();
   render();
+}
+
+function loadInitialPayload() {
+  if (USE_BROWSER_STORAGE) {
+    const stored = readStoredPayload();
+    if (stored) {
+      return stored;
+    }
+  }
+  return window.__APP_INITIAL_DATA__ || {};
+}
+
+function readStoredPayload() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch (error) {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+    console.warn("\u8bfb\u53d6\u6d4f\u89c8\u5668\u5b58\u6863\u5931\u8d25", error);
+    return null;
+  }
+}
+
+function persistPayload(payload) {
+  if (!USE_BROWSER_STORAGE) {
+    return;
+  }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch (error) {
+    console.warn("\u5199\u5165\u6d4f\u89c8\u5668\u5b58\u6863\u5931\u8d25", error);
+  }
 }
 
 function bindEvents() {
@@ -91,6 +136,7 @@ function applyPayload(payload) {
   );
   state.students = getSortedStudents(state.payload.students);
   syncSelection();
+  persistPayload(state.payload);
 }
 
 function render() {
@@ -127,17 +173,17 @@ function renderLists() {
     : base;
   dom.studentList.innerHTML = filtered.length
     ? filtered.map(renderStudentItem).join("")
-    : '<li class="empty-message">未找到匹配的学生</li>';
+    : '<li class="empty-message">\u672a\u627e\u5230\u5339\u914d\u7684\u5b66\u751f</li>';
   const coolingStudents = base.filter(student => student.is_cooling);
   dom.cooldownList.innerHTML = coolingStudents.length
     ? coolingStudents.map(renderCooldownItem).join("")
-    : '<li class="empty-message">当前没有学生处于冷却</li>';
+    : '<li class="empty-message">\u5f53\u524d\u6ca1\u6709\u5b66\u751f\u5904\u4e8e\u51b7\u5374</li>';
 }
 
 function renderStudentItem(student) {
   const color = groupColor(student.group);
   const cooldown = student.is_cooling
-    ? `冷却 ${formatDuration(student.remaining_cooldown)}`
+    ? `\u51b7\u5374 ${formatDuration(student.remaining_cooldown)}`
     : "";
   const domId = buildDomId("student", student.id);
   return `<li id="${domId}" class="student-item${
@@ -148,10 +194,10 @@ function renderStudentItem(student) {
     <div class="student-item-main">
       <div class="student-line">
         <span class="student-name">${escapeHtml(student.name)}</span>
-        <span class="student-badge">组 ${escapeHtml(String(student.group))}</span>
+        <span class="student-badge">\u7ec4 ${escapeHtml(String(student.group))}</span>
       </div>
       <div class="student-meta">
-        <span>点 ${student.pick_count} 次</span>
+        <span>\u62bd ${student.pick_count} \u6b21</span>
         ${
           student.is_cooling
             ? `<span class="student-cooldown">${escapeHtml(cooldown)}</span>`
@@ -165,16 +211,16 @@ function renderStudentItem(student) {
 
 function renderCooldownItem(student) {
   const color = groupColor(student.group);
-  const remaining = `剩余 ${formatDuration(student.remaining_cooldown)}`;
+  const remaining = `\u5269\u4f59 ${formatDuration(student.remaining_cooldown)}`;
   const last = student.last_pick
-    ? `上次 ${formatTime(student.last_pick)}`
-    : "最近人为设置";
+    ? `\u4e0a\u6b21 ${formatTime(student.last_pick)}`
+    : "\u6682\u65e0\u8bb0\u5f55";
   const domId = buildDomId("cooling", student.id);
   return `<li id="${domId}" class="student-item is-cooling" data-id="${escapeHtml(String(student.id))}" data-cooling="1" style="--group-color:${color}">
     <div class="student-item-main">
       <div class="student-line">
         <span class="student-name">${escapeHtml(student.name)}</span>
-        <span class="student-badge">组 ${escapeHtml(String(student.group))}</span>
+        <span class="student-badge">\u7ec4 ${escapeHtml(String(student.group))}</span>
       </div>
       <div class="student-meta">
         <span class="student-cooldown">${escapeHtml(remaining)}</span>
@@ -187,7 +233,7 @@ function renderCooldownItem(student) {
 function renderSelection() {
   if (!state.lastSelection) {
     dom.resultName.textContent = "--";
-    dom.resultNote.textContent = "等待抽取";
+    dom.resultNote.textContent = "\u7b49\u5f85\u62bd\u53d6";
     return;
   }
   if (state.lastSelection.type === "single") {
@@ -203,8 +249,8 @@ function renderSelection() {
       : null;
     dom.resultName.textContent = name;
     dom.resultNote.textContent = groupValue !== null
-      ? `来自第 ${groupValue} 组`
-      : "随机抽取";
+      ? `\u6765\u81ea\u7b2c ${groupValue} \u7ec4`
+      : "\u968f\u673a\u62bd\u53d6";
   } else {
     const names = [];
     let groupValue = Number.isFinite(state.lastSelection.group)
@@ -224,11 +270,11 @@ function renderSelection() {
     }
     state.lastSelection.group = groupValue;
     dom.resultName.textContent = groupValue !== null
-      ? `第 ${groupValue} 组`
-      : "小组抽取";
+      ? `\u7b2c ${groupValue} \u7ec4`
+      : "\u5c0f\u7ec4\u62bd\u53d6";
     dom.resultNote.textContent = names.length
-      ? names.join("、")
-      : "成员已加入冷却";
+      ? names.join("\u3001")
+      : "\u6210\u5458\u5df2\u52a0\u5165\u51b7\u5374";
   }
 }
 
@@ -294,7 +340,7 @@ function openCooldownModal() {
 async function handleCooldownSave(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric < 1) {
-    showToast("冷却天数必须是正整数");
+    showToast("\u51b7\u5374\u5929\u6570\u5fc5\u987b\u662f\u6b63\u6574\u6570");
     const input = dom.modalRoot.querySelector("#cooldown-days");
     if (input) {
       input.focus();
@@ -315,7 +361,7 @@ async function handleCooldownSave(value) {
     const response = await sendAction("set_cooldown", { days: target });
     applyPayload(response.payload);
     render();
-    showToast("冷却时间已更新");
+    showToast("\u51b7\u5374\u65f6\u95f4\u5df2\u66f4\u65b0");
     closeModal();
   } catch (error) {
     showToast(error.message);
@@ -332,9 +378,9 @@ async function handleClearCooldown() {
   }
   closeContextMenu();
   const confirmed = await openConfirmModal({
-    title: "清除冷却状态",
-    message: "确认要将当前所有学生移出冷却列表并立即可抽取吗？",
-    confirmLabel: "清除冷却",
+    title: "\u6e05\u9664\u51b7\u5374\u72b6\u6001",
+    message: "\u786e\u8ba4\u8981\u5c06\u5f53\u524d\u6240\u6709\u5b66\u751f\u79fb\u51fa\u51b7\u5374\u5217\u8868\u5e76\u7acb\u5373\u53ef\u62bd\u53d6\u5417\uff1f",
+    confirmLabel: "\u6e05\u9664\u51b7\u5374",
     confirmTone: "danger",
   });
   if (!confirmed) {
@@ -345,7 +391,7 @@ async function handleClearCooldown() {
     const response = await sendAction("clear_cooldown");
     applyPayload(response.payload);
     render();
-    showToast("冷却列表已清空");
+    showToast("\u51b7\u5374\u5217\u8868\u5df2\u6e05\u7a7a");
   } catch (error) {
     showToast(error.message);
   } finally {
@@ -397,14 +443,14 @@ function handleContextSelection(event) {
     return;
   }
   if (action === "force") {
-    runSimpleAction("student_force_cooldown", { student_id: id }, "已标记冷却");
+    runSimpleAction("student_force_cooldown", { student_id: id }, "\u5df2\u6807\u8bb0\u51b7\u5374");
     return;
   }
   if (action === "release") {
     runSimpleAction(
       "student_release_cooldown",
       { student_id: id },
-      "已解除冷却"
+      "\u5df2\u89e3\u9664\u51b7\u5374"
     );
   }
 }
@@ -445,10 +491,10 @@ async function runSimpleAction(action, payload, message) {
 function openContextMenu(student, x, y) {
   closeContextMenu();
   const entries = [
-    { action: "edit", label: "查看详情" },
+    { action: "edit", label: "\u67e5\u770b\u8be6\u60c5" },
     student.is_cooling
-      ? { action: "release", label: "解除冷却" }
-      : { action: "force", label: "强制冷却" },
+      ? { action: "release", label: "\u89e3\u9664\u51b7\u5374" }
+      : { action: "force", label: "\u5f3a\u5236\u51b7\u5374" },
   ];
   dom.contextMenu.innerHTML = entries
     .map(
@@ -486,7 +532,7 @@ function openStudentModal(mode, studentId) {
   if (mode === "edit") {
     student = state.studentsMap.get(studentId);
     if (!student) {
-      showToast("未找到该学生");
+      showToast("\u672a\u627e\u5230\u8be5\u5b66\u751f");
       return;
     }
   }
@@ -515,10 +561,10 @@ function openStudentModal(mode, studentId) {
           return;
         }
         const confirmed = await openConfirmModal({
-          title: "删除学生",
-          message: `确定要删除 ${student.name} 吗？该操作无法撤销。`,
-          confirmLabel: "删除",
-          cancelLabel: "保留",
+          title: "\u5220\u9664\u5b66\u751f",
+          message: `\u786e\u5b9a\u8981\u5220\u9664 ${student.name} \u5417\uff1f\u8be5\u64cd\u4f5c\u65e0\u6cd5\u64a4\u9500\u3002`,
+          confirmLabel: "\u5220\u9664",
+          cancelLabel: "\u4fdd\u7559",
           confirmTone: "danger",
         });
         if (!confirmed) {
@@ -621,10 +667,10 @@ function closeModal() {
 }
 function openConfirmModal(options) {
   const config = {
-    title: options && options.title ? options.title : "确认操作",
+    title: options && options.title ? options.title : "\u786e\u8ba4\u64cd\u4f5c",
     message: options && options.message ? options.message : "",
-    confirmLabel: options && options.confirmLabel ? options.confirmLabel : "确认",
-    cancelLabel: options && options.cancelLabel ? options.cancelLabel : "取消",
+    confirmLabel: options && options.confirmLabel ? options.confirmLabel : "\u786e\u8ba4",
+    cancelLabel: options && options.cancelLabel ? options.cancelLabel : "\u53d6\u6d88",
     confirmTone: options && options.confirmTone ? options.confirmTone : "accent",
   };
   return new Promise(resolve => {
@@ -679,7 +725,7 @@ function openHistoryModal(studentId) {
   closeContextMenu();
   const student = state.studentsMap.get(studentId);
   if (!student) {
-    showToast("未找到该学生");
+    showToast("\u672a\u627e\u5230\u8be5\u5b66\u751f");
     return;
   }
   const content = buildHistoryModal(student);
@@ -714,7 +760,7 @@ function handleHistoryListClick(event) {
   if (!studentId) {
     return;
   }
-  const confirmed = window.confirm("确认删除该条记录？");
+  const confirmed = window.confirm("\u786e\u8ba4\u5220\u9664\u8be5\u6761\u8bb0\u5f55\uff1f");
   if (!confirmed) {
     return;
   }
@@ -727,14 +773,14 @@ async function handleHistoryClear(studentId) {
   }
   const student = state.studentsMap.get(studentId);
   if (!student) {
-    showToast("未找到该学生");
+    showToast("\u672a\u627e\u5230\u8be5\u5b66\u751f");
     return;
   }
   if (!student.pick_history.length) {
-    showToast("暂无记录");
+    showToast("\u6682\u65e0\u8bb0\u5f55");
     return;
   }
-  const confirmed = window.confirm(`确认清空 ${student.name} 的历史记录？`);
+  const confirmed = window.confirm(`\u786e\u8ba4\u6e05\u7a7a ${student.name} \u7684\u5386\u53f2\u8bb0\u5f55\uff1f`);
   if (!confirmed) {
     return;
   }
@@ -743,7 +789,7 @@ async function handleHistoryClear(studentId) {
     const response = await sendAction("student_history_clear", { student_id: studentId });
     applyPayload(response.payload);
     render();
-    showToast("已清空历史");
+    showToast("\u5df2\u6e05\u7a7a\u5386\u53f2");
   } catch (error) {
     showToast(error.message);
   } finally {
@@ -763,7 +809,7 @@ async function handleHistoryRemove(studentId, timestamp) {
     });
     applyPayload(response.payload);
     render();
-    showToast("已删除记录");
+    showToast("\u5df2\u5220\u9664\u8bb0\u5f55");
   } catch (error) {
     showToast(error.message);
   } finally {
@@ -774,35 +820,35 @@ async function handleHistoryRemove(studentId, timestamp) {
 function buildHistoryModal(student) {
   const hasHistory =
     Array.isArray(student.pick_history) && student.pick_history.length > 0;
-  const lastTime = student.last_pick ? formatTime(student.last_pick) : "暂无记录";
+  const lastTime = student.last_pick ? formatTime(student.last_pick) : "\u6682\u65e0\u8bb0\u5f55";
   const lastSince = student.last_pick ? formatSince(student.last_pick) : "";
   const historyList = buildHistoryList(student.pick_history, { withActions: true });
   const sinceMarkup = student.last_pick
-    ? ` · <small class="history-since-tag" data-history-last-since>${escapeHtml(lastSince)}</small>`
+    ? ` \u00b7 <small class="history-since-tag" data-history-last-since>${escapeHtml(lastSince)}</small>`
     : "";
   return `<div class="modal-backdrop" data-history-root data-history-student="${escapeHtml(student.id)}">
     <div class="modal-panel glass history-modal">
       <div class="modal-header">
-        <h3>历史点名</h3>
-        <button type="button" class="btn btn-icon" data-modal-close aria-label="关闭">×</button>
+        <h3>\u5386\u53f2\u70b9\u540d</h3>
+        <button type="button" class="btn btn-icon" data-modal-close aria-label="\u5173\u95ed">\u00d7</button>
       </div>
       <div class="modal-body slim-scroll">
         <div class="history-summary">
           <div class="summary-name">${escapeHtml(student.name)}</div>
           <div class="summary-meta">
-            <span class="summary-tag">组 <strong data-history-group>${escapeHtml(String(student.group))}</strong></span>
-            <span class="summary-tag">点名 <strong data-history-count>${student.pick_count}</strong> 次</span>
-            <span class="summary-tag">最近 <strong data-history-last>${escapeHtml(lastTime)}</strong>${sinceMarkup}</span>
+            <span class="summary-tag">\u7ec4 <strong data-history-group>${escapeHtml(String(student.group))}</strong></span>
+            <span class="summary-tag">\u70b9\u540d <strong data-history-count>${student.pick_count}</strong> \u6b21</span>
+            <span class="summary-tag">\u6700\u8fd1 <strong data-history-last>${escapeHtml(lastTime)}</strong>${sinceMarkup}</span>
           </div>
         </div>
         <div class="history-box">
-          <div class="history-title">记录列表</div>
+          <div class="history-title">\u8bb0\u5f55\u5217\u8868</div>
           <ul class="history-list slim-scroll history-list-actions">${historyList}</ul>
         </div>
       </div>
       <div class="modal-footer history-footer">
-        <button type="button" class="btn btn-outline-danger" id="history-clear" data-history-action${hasHistory ? "" : " disabled"}>清空历史</button>
-        <button type="button" class="btn btn-outline-light" data-modal-close>关闭</button>
+        <button type="button" class="btn btn-outline-danger" id="history-clear" data-history-action${hasHistory ? "" : " disabled"}>\u6e05\u7a7a\u5386\u53f2</button>
+        <button type="button" class="btn btn-outline-light" data-modal-close>\u5173\u95ed</button>
       </div>
     </div>
   </div>`;
@@ -844,7 +890,7 @@ function updateHistoryModal(studentId) {
     }
   } else {
     if (last) {
-      last.textContent = "暂无记录";
+      last.textContent = "\u6682\u65e0\u8bb0\u5f55";
     }
     if (since) {
       since.textContent = "";
@@ -861,20 +907,20 @@ function buildCooldownModal(currentDays) {
   return `<div class="modal-backdrop">
     <div class="modal-panel glass">
       <div class="modal-header">
-        <h3>设置冷却天数</h3>
-        <button type="button" class="btn btn-icon" data-modal-close aria-label="关闭">×</button>
+        <h3>\u8bbe\u7f6e\u51b7\u5374\u5929\u6570</h3>
+        <button type="button" class="btn btn-icon" data-modal-close aria-label="\u5173\u95ed">\u00d7</button>
       </div>
       <form id="cooldown-form">
         <div class="modal-body slim-scroll">
-          <p class="text-muted">调整全员抽取后的冷却时长，防止短时间内重复点名。</p>
+          <p class="text-muted">\u8c03\u6574\u5168\u5458\u62bd\u53d6\u540e\u7684\u51b7\u5374\u65f6\u957f\uff0c\u9632\u6b62\u77ed\u65f6\u95f4\u5185\u91cd\u590d\u70b9\u540d\u3002</p>
           <div class="mb-3">
-            <label class="form-label">冷却天数</label>
+            <label class="form-label">\u51b7\u5374\u5929\u6570</label>
             <input id="cooldown-days" type="number" min="1" class="form-control" value="${escapeHtml(String(value))}" required autocomplete="off">
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-outline-light" data-modal-close>取消</button>
-          <button type="submit" class="btn btn-accent">保存</button>
+          <button type="button" class="btn btn-outline-light" data-modal-close>\u53d6\u6d88</button>
+          <button type="submit" class="btn btn-accent">\u4fdd\u5b58</button>
         </div>
       </form>
     </div>
@@ -883,10 +929,10 @@ function buildCooldownModal(currentDays) {
 
 function buildConfirmModal(options) {
   const {
-    title = "确认操作",
+    title = "\u786e\u8ba4\u64cd\u4f5c",
     message = "",
-    confirmLabel = "确认",
-    cancelLabel = "取消",
+    confirmLabel = "\u786e\u8ba4",
+    cancelLabel = "\u53d6\u6d88",
     confirmTone = "accent",
   } = options || {};
   const confirmClass = confirmTone === "danger" ? "btn btn-danger" : "btn btn-accent";
@@ -894,7 +940,7 @@ function buildConfirmModal(options) {
     <div class="modal-panel glass">
       <div class="modal-header">
         <h3>${escapeHtml(title)}</h3>
-        <button type="button" class="btn btn-icon" data-modal-close aria-label="关闭">×</button>
+        <button type="button" class="btn btn-icon" data-modal-close aria-label="\u5173\u95ed">\u00d7</button>
       </div>
       <div class="modal-body slim-scroll">
         <p class="text-muted">${escapeHtml(message)}</p>
@@ -912,75 +958,75 @@ function buildStudentModal(mode, student) {
     return `<div class="modal-backdrop">
       <div class="modal-panel glass">
         <div class="modal-header">
-          <h3>添加学生</h3>
-          <button type="button" class="btn btn-icon" data-modal-close aria-label="关闭">×</button>
+          <h3>\u6dfb\u52a0\u5b66\u751f</h3>
+          <button type="button" class="btn btn-icon" data-modal-close aria-label="\u5173\u95ed">\u00d7</button>
         </div>
         <form id="student-form">
           <div class="modal-body slim-scroll">
             <div class="mb-3">
-              <label class="form-label">学号</label>
-              <input name="student_id" type="text" class="form-control" placeholder="留空将自动生成" autocomplete="off">
+              <label class="form-label">\u5b66\u53f7</label>
+              <input name="student_id" type="text" class="form-control" placeholder="\u7559\u7a7a\u5c06\u81ea\u52a8\u751f\u6210" autocomplete="off">
             </div>
             <div class="mb-3">
-              <label class="form-label">姓名</label>
+              <label class="form-label">\u59d3\u540d</label>
               <input name="name" type="text" class="form-control" required autocomplete="off">
             </div>
             <div class="mb-3">
-              <label class="form-label">小组</label>
+              <label class="form-label">\u5c0f\u7ec4</label>
               <input name="group" type="number" class="form-control" min="0" step="1" value="0">
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-outline-light" data-modal-close>取消</button>
-            <button type="submit" class="btn btn-accent">新增</button>
+            <button type="button" class="btn btn-outline-light" data-modal-close>\u53d6\u6d88</button>
+            <button type="submit" class="btn btn-accent">\u65b0\u589e</button>
           </div>
         </form>
       </div>
     </div>`;
   }
   const historyItems = buildHistoryList(student.pick_history);
-  const lastPick = student.last_pick ? formatTime(student.last_pick) : "暂无记录";
+  const lastPick = student.last_pick ? formatTime(student.last_pick) : "\u6682\u65e0\u8bb0\u5f55";
   return `<div class="modal-backdrop">
     <div class="modal-panel glass">
       <div class="modal-header">
-        <h3>编辑学生</h3>
-        <button type="button" class="btn btn-icon" data-modal-close aria-label="关闭">×</button>
+        <h3>\u7f16\u8f91\u5b66\u751f</h3>
+        <button type="button" class="btn btn-icon" data-modal-close aria-label="\u5173\u95ed">\u00d7</button>
       </div>
       <form id="student-form">
         <div class="modal-body slim-scroll">
           <div class="row g-3">
             <div class="col-12 col-md-6">
-              <label class="form-label">学号</label>
+              <label class="form-label">\u5b66\u53f7</label>
               <input name="student_id" type="text" class="form-control" value="${escapeHtml(student.id)}" autocomplete="off">
             </div>
             <div class="col-12 col-md-6">
-              <label class="form-label">小组</label>
+              <label class="form-label">\u5c0f\u7ec4</label>
               <input name="group" type="number" class="form-control" min="0" step="1" value="${escapeHtml(String(student.group))}">
             </div>
             <div class="col-12">
-              <label class="form-label">姓名</label>
+              <label class="form-label">\u59d3\u540d</label>
               <input name="name" type="text" class="form-control" value="${escapeHtml(student.name)}" required autocomplete="off">
             </div>
           </div>
           <div class="student-info-grid mt-3">
             <div>
-              <span class="info-label">累计点名</span>
+              <span class="info-label">\u7d2f\u8ba1\u70b9\u540d</span>
               <span class="info-value">${student.pick_count}</span>
             </div>
             <div>
-              <span class="info-label">最近一次</span>
+              <span class="info-label">\u6700\u8fd1\u4e00\u6b21</span>
               <span class="info-value">${escapeHtml(lastPick)}</span>
             </div>
           </div>
           <div class="history-box mt-4">
-            <div class="history-title">历史记录</div>
+            <div class="history-title">\u5386\u53f2\u8bb0\u5f55</div>
             <ul class="history-list slim-scroll">${historyItems}</ul>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" id="delete-student" class="btn btn-outline-danger">删除学生</button>
-          <button type="button" class="btn btn-outline-light" data-modal-close>取消</button>
-          <button type="submit" class="btn btn-accent">保存修改</button>
+          <button type="button" id="delete-student" class="btn btn-outline-danger">\u5220\u9664\u5b66\u751f</button>
+          <button type="button" class="btn btn-outline-light" data-modal-close>\u53d6\u6d88</button>
+          <button type="submit" class="btn btn-accent">\u4fdd\u5b58\u4fee\u6539</button>
         </div>
       </form>
     </div>
@@ -989,7 +1035,7 @@ function buildStudentModal(mode, student) {
 function buildHistoryList(history, options = {}) {
   const { withActions = false } = options;
   if (!Array.isArray(history) || !history.length) {
-    return '<li class="history-empty">暂无记录</li>';
+    return '<li class="history-empty">\u6682\u65e0\u8bb0\u5f55</li>';
   }
   const sorted = history
     .map(value => Number(value))
@@ -1000,7 +1046,7 @@ function buildHistoryList(history, options = {}) {
     const timeLabel = escapeHtml(formatTime(timestamp));
     const sinceLabel = escapeHtml(formatSince(timestamp));
     const action = withActions
-      ? `<button type="button" class="history-delete" data-history-remove="${escapeHtml(String(timestamp))}" data-history-action>删除</button>`
+      ? `<button type="button" class="history-delete" data-history-remove="${escapeHtml(String(timestamp))}" data-history-action>\u5220\u9664</button>`
       : "";
     return `<li>
       <span class="history-index">${order}.</span>
@@ -1021,21 +1067,21 @@ async function handleStudentFormSubmit(mode, context) {
   const idValue = idInput ? idInput.value.trim() : "";
   const nameValue = nameInput.value.trim();
   if (!nameValue) {
-    showToast("姓名不能为空");
+    showToast("\u59d3\u540d\u4e0d\u80fd\u4e3a\u7a7a");
     nameInput.focus();
     nameInput.select();
     return;
   }
   const groupValue = sanitizeGroup(groupInput.value);
   if (groupValue < 0) {
-    showToast("组别需为非负整数");
+    showToast("\u7ec4\u522b\u9700\u4e3a\u975e\u8d1f\u6574\u6570");
     groupInput.focus();
     groupInput.select();
     return;
   }
   if (mode === "create") {
     if (idValue && state.studentsMap.has(idValue)) {
-      showToast("编号已存在");
+      showToast("\u7f16\u53f7\u5df2\u5b58\u5728");
       if (idInput) {
         idInput.focus();
         idInput.select();
@@ -1043,7 +1089,7 @@ async function handleStudentFormSubmit(mode, context) {
       return;
     }
     if (studentNameExists(nameValue)) {
-      showToast("姓名已存在");
+      showToast("\u59d3\u540d\u5df2\u5b58\u5728");
       nameInput.focus();
       nameInput.select();
       return;
@@ -1058,7 +1104,7 @@ async function handleStudentFormSubmit(mode, context) {
   const currentId = context.student.id;
   const targetId = idValue || currentId;
   if (targetId !== currentId && state.studentsMap.has(targetId)) {
-    showToast("编号已存在");
+    showToast("\u7f16\u53f7\u5df2\u5b58\u5728");
     if (idInput) {
       idInput.focus();
       idInput.select();
@@ -1066,7 +1112,7 @@ async function handleStudentFormSubmit(mode, context) {
     return;
   }
   if (studentNameExists(nameValue, currentId)) {
-    showToast("姓名已存在");
+    showToast("\u59d3\u540d\u5df2\u5b58\u5728");
     nameInput.focus();
     nameInput.select();
     return;
@@ -1085,7 +1131,7 @@ async function submitStudentCreate(payload) {
     const response = await sendAction("student_create", payload);
     applyPayload(response.payload);
     render();
-    showToast("已新增学生");
+    showToast("\u5df2\u65b0\u589e\u5b66\u751f");
     closeModal();
   } catch (error) {
     showToast(error.message);
@@ -1102,7 +1148,7 @@ async function submitStudentUpdate(payload) {
     const response = await sendAction("student_update", payload);
     applyPayload(response.payload);
     render();
-    showToast("已保存修改");
+    showToast("\u5df2\u4fdd\u5b58\u4fee\u6539");
     closeModal();
   } catch (error) {
     showToast(error.message);
@@ -1124,7 +1170,7 @@ async function handleStudentDelete(student) {
     });
     applyPayload(response.payload);
     render();
-    showToast("已删除学生");
+    showToast("\u5df2\u5220\u9664\u5b66\u751f");
     closeModal();
   } catch (error) {
     showToast(error.message);
@@ -1202,14 +1248,14 @@ function runSelectionAnimation(result) {
   state.isAnimating = true;
   updateControls();
   dom.resultCard.classList.add("is-animating");
-  dom.resultNote.textContent = "正在抽取...";
+  dom.resultNote.textContent = "\u6b63\u5728\u62bd\u53d6...";
   let index = 0;
   let showFrame;
   if (type === "group") {
     showFrame = value => {
       const numeric = Number(value);
       dom.resultName.textContent = Number.isFinite(numeric)
-        ? `第 ${numeric} 组`
+        ? `\u7b2c ${numeric} \u7ec4`
         : "--";
     };
   } else {
@@ -1443,6 +1489,9 @@ function getSortedStudents(students) {
 
 async function sendAction(action, data) {
   const payload = { action, ...data };
+  if (USE_BROWSER_STORAGE) {
+    payload.payload = state.payload;
+  }
   let response;
   try {
     response = await fetch("/actions", {
@@ -1453,7 +1502,7 @@ async function sendAction(action, data) {
       body: JSON.stringify(payload),
     });
   } catch {
-    throw new Error("网络请求失败");
+    throw new Error("\u7f51\u7edc\u8bf7\u6c42\u5931\u8d25");
   }
   let result = {};
   try {
@@ -1462,7 +1511,7 @@ async function sendAction(action, data) {
     result = {};
   }
   if (!response.ok) {
-    throw new Error(result.message || "操作失败");
+    throw new Error(result.message || "\u64cd\u4f5c\u5931\u8d25");
   }
   return result;
 }
@@ -1524,7 +1573,7 @@ function formatTime(timestamp) {
 function formatDuration(seconds) {
   let value = Math.floor(Number(seconds));
   if (!Number.isFinite(value) || value <= 0) {
-    return "少于 1 分钟";
+    return "\u5c11\u4e8e 1 \u5206\u949f";
   }
   const days = Math.floor(value / 86400);
   value %= 86400;
@@ -1533,16 +1582,16 @@ function formatDuration(seconds) {
   const minutes = Math.floor(value / 60);
   const parts = [];
   if (days) {
-    parts.push(`${days} 天`);
+    parts.push(`${days} \u5929`);
   }
   if (hours) {
-    parts.push(`${hours} 小时`);
+    parts.push(`${hours} \u5c0f\u65f6`);
   }
   if (!days && minutes) {
-    parts.push(`${minutes} 分钟`);
+    parts.push(`${minutes} \u5206\u949f`);
   }
   if (!parts.length) {
-    parts.push("少于 1 分钟");
+    parts.push("\u5c11\u4e8e 1 \u5206\u949f");
   }
   return parts.join(" ");
 }
@@ -1551,15 +1600,15 @@ function formatSince(timestamp) {
   const now = Date.now() / 1000;
   const diff = Math.max(0, Math.floor(now - Number(timestamp)));
   if (diff < 60) {
-    return "刚刚";
+    return "\u521a\u521a";
   }
   if (diff < 3600) {
-    return `${Math.floor(diff / 60)} 分钟前`;
+    return `${Math.floor(diff / 60)} \u5206\u949f\u524d`;
   }
   if (diff < 86400) {
-    return `${Math.floor(diff / 3600)} 小时前`;
+    return `${Math.floor(diff / 3600)} \u5c0f\u65f6\u524d`;
   }
-  return `${Math.floor(diff / 86400)} 天前`;
+  return `${Math.floor(diff / 86400)} \u5929\u524d`;
 }
 
 function escapeHtml(value) {
@@ -1584,9 +1633,6 @@ function showToast(message) {
     dom.toast.classList.remove("show");
   }, 2400);
 }
-
-
-
 
 
 

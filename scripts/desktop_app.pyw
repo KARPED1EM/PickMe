@@ -6,16 +6,26 @@ import os
 import socket
 import sys
 import threading
-from pathlib import Path
 
 import uvicorn
-
 import webview
+
 from app import create_app
-from pickme_bootstrap import application_paths
+from pickme.paths import application_paths
 
+log = logging.getLogger("pickme.desktop")
 
-log = logging.getLogger("pickme")
+ALREADY_RUNNING_MESSAGE = (
+    "\u7a0b\u5e8f\u5df2\u7ecf\u5728\u8fd0\u884c\u3002\n\nApplication is already running."
+)
+ALREADY_RUNNING_TITLE = "\u63d0\u793a | Notice"
+WEBVIEW_MISSING_MESSAGE = (
+    "\u672a\u68c0\u6d4b\u5230 Microsoft Edge WebView2 \u8fd0\u884c\u65f6\n"
+    "\u662f\u5426\u6253\u5f00\u5b98\u65b9\u4e0b\u8f7d\u9875\u9762\uff1f\n\n"
+    "WebView2 Runtime is not installed.\n"
+    "Open the official download page?"
+)
+WEBVIEW_MISSING_TITLE = "\u4f9d\u8d56\u7f3a\u5931 | Dependency Required"
 
 
 def find_free_port(host: str = "127.0.0.1") -> int:
@@ -59,9 +69,9 @@ def message_box(text: str, title: str, flags: int = 0x00000040 | 0x00000000) -> 
 
 def already_running(mutex_name: str = "Global\\PickMeMutex") -> bool:
     ctypes.windll.kernel32.SetLastError(0)
-    h = ctypes.windll.kernel32.CreateMutexW(None, True, mutex_name)
+    handle = ctypes.windll.kernel32.CreateMutexW(None, True, mutex_name)
     err = ctypes.windll.kernel32.GetLastError()
-    return err == 183
+    return handle and err == 183
 
 
 def webview2_installed() -> bool:
@@ -83,25 +93,25 @@ def webview2_installed() -> bool:
     ]
     for root, path in keys:
         try:
-            with winreg.OpenKey(root, path) as k:
-                pv, _ = winreg.QueryValueEx(k, "pv")
+            with winreg.OpenKey(root, path) as key:
+                pv, _ = winreg.QueryValueEx(key, "pv")
                 if pv and pv != "0.0.0.0":
                     return True
         except FileNotFoundError:
-            pass
+            continue
     return False
 
 
 def prompt_open_webview2_page_and_exit() -> None:
-    text = "未检测到 Microsoft Edge WebView2 运行时。\n是否前往官方下载页面？\n\nWebView2 Runtime is not installed.\nOpen the official download page?"
-    title = "依赖缺失 | Dependency Required"
-    ret = message_box(text, title, 0x00000040 | 0x00000004 | 0x00040000)
+    ret = message_box(
+        WEBVIEW_MISSING_MESSAGE, WEBVIEW_MISSING_TITLE, 0x00000040 | 0x00000004 | 0x00040000
+    )
     if ret == 6:
         url = "https://developer.microsoft.com/en-us/microsoft-edge/webview2/consumer"
         try:
             os.startfile(url)
-        except Exception:
-            pass
+        except OSError:
+            log.exception("Failed to open WebView2 runtime download page")
     sys.exit(0)
 
 
@@ -109,11 +119,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
     if already_running():
-        message_box(
-            "程序已在运行。\n\nApplication is already running.",
-            "提示 | Notice",
-            0x00000040 | 0x00000000 | 0x00040000,
-        )
+        message_box(ALREADY_RUNNING_MESSAGE, ALREADY_RUNNING_TITLE, 0x00000040 | 0x00040000)
         sys.exit(0)
 
     if not webview2_installed():
@@ -122,7 +128,7 @@ def main() -> None:
     package_dir, default_data_dir, user_dir = application_paths()
     log.info("Using user data directory: %s", user_dir)
 
-    app = create_app(user_dir, default_data_dir)
+    app = create_app(user_dir, default_data_dir, storage_mode="filesystem")
     host = "127.0.0.1"
     port = find_free_port(host)
 
@@ -143,6 +149,8 @@ def main() -> None:
         if server.is_alive():
             server.shutdown()
         server.join(timeout=5)
+        if window:
+            del window
 
 
 if __name__ == "__main__":

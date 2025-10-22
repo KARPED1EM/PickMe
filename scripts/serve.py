@@ -4,17 +4,25 @@ import argparse
 import logging
 import socket
 from pathlib import Path
+import sys
 
 import uvicorn
 
-from app import create_app
-from pickme_bootstrap import application_paths
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from app import create_app  # noqa: E402
+from pickme.paths import application_paths  # noqa: E402
 
 log = logging.getLogger("pickme.server")
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Start the PickMe FastAPI server.")
+    parser = argparse.ArgumentParser(
+        prog="python -m scripts.serve",
+        description="Start the PickMe FastAPI server.",
+    )
     parser.add_argument("--host", default="127.0.0.1", help="Host address to bind.")
     parser.add_argument(
         "--port",
@@ -26,13 +34,13 @@ def parse_args() -> argparse.Namespace:
         "--user-data-dir",
         type=Path,
         default=None,
-        help="Directory used to store user data. Defaults to the system profile path.",
+        help="Directory used to store user data when using filesystem storage.",
     )
     parser.add_argument(
         "--default-data-dir",
         type=Path,
         default=None,
-        help="Directory providing bundled default data. Defaults to the packaged assets.",
+        help="Directory containing bundled default data (defaults to packaged assets).",
     )
     parser.add_argument(
         "--reload",
@@ -44,6 +52,15 @@ def parse_args() -> argparse.Namespace:
         default="info",
         help="Logging level passed to uvicorn (e.g. debug, info, warning).",
     )
+    parser.add_argument(
+        "--storage",
+        default="browser",
+        choices=["filesystem", "browser", "auto"],
+        help=(
+            "Persistence mode: filesystem (desktop-style local files), "
+            "browser (per-client localStorage), or auto."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -53,10 +70,18 @@ def find_free_port(host: str) -> int:
         return sock.getsockname()[1]
 
 
+def normalize_storage_mode(value: str) -> str:
+    if value == "auto":
+        return "browser"
+    return value
+
+
 def main() -> None:
     args = parse_args()
 
-    logging.basicConfig(level=getattr(logging, str(args.log_level).upper(), logging.INFO))
+    logging.basicConfig(
+        level=getattr(logging, str(args.log_level).upper(), logging.INFO)
+    )
 
     _, default_data_dir, user_dir = application_paths()
     if args.default_data_dir:
@@ -64,19 +89,22 @@ def main() -> None:
     if args.user_data_dir:
         user_dir = args.user_data_dir
 
-    user_dir.mkdir(parents=True, exist_ok=True)
+    storage_mode = normalize_storage_mode(args.storage)
+    if storage_mode == "filesystem":
+        user_dir.mkdir(parents=True, exist_ok=True)
 
-    app = create_app(user_dir, default_data_dir)
+    app = create_app(user_dir, default_data_dir, storage_mode=storage_mode)
 
     port = args.port
     if port == 0:
         port = find_free_port(args.host)
 
     log.info(
-        "Starting PickMe server on http://%s:%s (user data: %s)",
+        "Starting PickMe server on http://%s:%s (storage: %s, location: %s)",
         args.host,
         port,
-        user_dir,
+        app.state.storage.mode,
+        app.state.storage.location_hint,
     )
 
     uvicorn.run(
@@ -90,4 +118,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

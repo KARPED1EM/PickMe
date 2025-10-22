@@ -41,7 +41,7 @@ jobs:
         shell: pwsh
         run: |
           if (Test-Path dist) { Remove-Item -Recurse -Force dist }
-          pyinstaller start.pyw --clean --onefile --noconsole `
+          pyinstaller scripts/desktop_app.pyw --clean --onefile --noconsole `
             --name PickMe `
             --icon "icon.ico" `
             --add-data "app/templates;app/templates" `
@@ -67,7 +67,7 @@ jobs:
           New-Item -ItemType Directory -Path "app\data" | Out-Null
           Copy-Item -Recurse -Force "data-ithm\*" "app\data\"
 
-          pyinstaller start.pyw --clean --onefile --noconsole `
+          pyinstaller scripts/desktop_app.pyw --clean --onefile --noconsole `
             --name PickMe `
             --icon "icon.ico" `
             --add-data "app/templates;app/templates" `
@@ -111,7 +111,7 @@ jobs:
         shell: pwsh
         run: |
           if (Test-Path dist) { Remove-Item -Recurse -Force dist }
-          pyinstaller start.pyw --clean --onefile --noconsole `
+          pyinstaller scripts/desktop_app.pyw --clean --onefile --noconsole `
             --name PickMe `
             --icon "icon.ico" `
             --add-data "app/templates;app/templates" `
