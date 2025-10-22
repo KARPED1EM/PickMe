@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 _MODULE_DIR = Path(__file__).resolve().parent
-_DEFAULT_FILE = "students_data.json"
+_DEFAULT_FILE = "pickme_state.json"
 _DEFAULT_DATA_PATH = _MODULE_DIR / "data" / _DEFAULT_FILE
 try:
     _DEFAULT_PAYLOAD = _DEFAULT_DATA_PATH.read_text(encoding="utf-8")

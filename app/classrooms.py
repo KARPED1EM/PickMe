@@ -8,7 +8,7 @@ from typing import Any, Iterable
 
 from .students_cms import StudentsCms
 
-CURRENT_VERSION = 2
+CURRENT_VERSION = 3
 DEFAULT_CLASS_NAME = "默认班级"
 
 

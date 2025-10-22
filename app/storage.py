@@ -56,7 +56,9 @@ class BrowserStorageBackend:
         if request_data:
             payload = request_data.get("payload")
             if isinstance(payload, (str, dict)):
-                return ClassroomsState.from_payload(payload, fallback=self._default_payload)
+                return ClassroomsState.from_payload(
+                    payload, fallback=self._default_payload
+                )
         return ClassroomsState.from_payload(None, fallback=self._default_payload)
 
     def save(self, state: ClassroomsState) -> None:

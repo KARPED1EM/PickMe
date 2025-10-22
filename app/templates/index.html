@@ -14,31 +14,31 @@
     <section class="glass result-card p-4">
         <div class="result-header">
             <div class="result-primary">
-                <div class="class-switcher-wrapper">
-                    <button id="class-switcher" type="button" class="btn btn-ghost class-switcher">
-                        <span class="class-switcher-label" id="class-switcher-label">--</span>
-                        <span class="class-switcher-icon" aria-hidden="true">
-                            <svg viewBox="0 0 16 16" fill="none">
-                                <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
-                            </svg>
-                        </span>
-                    </button>
-                </div>
                 <div id="result-name" class="result-name">--</div>
                 <div id="result-note" class="result-note">&#x7B49;&#x5F85;&#x62BD;&#x53D6;...</div>
             </div>
-            <div class="result-stats">
-                <div class="result-stat">
-                    <span class="result-stat-label">&#x603B;&#x4EBA;&#x6570;</span>
-                    <span id="stat-total" class="result-stat-value">0</span>
-                </div>
-                <div class="result-stat">
-                    <span class="result-stat-label">&#x51B7;&#x5374;&#x4E2D;</span>
-                    <span id="stat-cooling" class="result-stat-value">0</span>
-                </div>
-                <div class="result-stat">
-                    <span class="result-stat-label">&#x53EF;&#x62BD;&#x53D6;</span>
-                    <span id="stat-available" class="result-stat-value">0</span>
+            <div class="result-meta">
+                <button id="class-switcher" type="button" class="btn btn-ghost class-switcher">
+                    <span class="class-switcher-label" id="class-switcher-label">--</span>
+                    <span class="class-switcher-icon" aria-hidden="true">
+                        <svg viewBox="0 0 16 16" fill="none">
+                            <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                    </span>
+                </button>
+                <div class="result-stats">
+                    <div class="result-stat">
+                        <span class="result-stat-label">&#x603B;&#x4EBA;&#x6570;</span>
+                        <span id="stat-total" class="result-stat-value">0</span>
+                    </div>
+                    <div class="result-stat">
+                        <span class="result-stat-label">&#x51B7;&#x5374;&#x4E2D;</span>
+                        <span id="stat-cooling" class="result-stat-value">0</span>
+                    </div>
+                    <div class="result-stat">
+                        <span class="result-stat-label">&#x53EF;&#x62BD;&#x53D6;</span>
+                        <span id="stat-available" class="result-stat-value">0</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -49,6 +49,7 @@
             </div>
             <div class="result-buttons">
                 <button id="pick-any" class="btn btn-accent">&#x968F;&#x673A;&#x62BD;&#x4EBA;</button>
+                <button id="pick-batch" class="btn btn-outline-light">&#x6279;&#x91CF;&#x62BD;&#x53D6;</button>
                 <button id="pick-group" class="btn btn-outline-light">&#x62BD;&#x53D6;&#x5C0F;&#x7EC4;</button>
             </div>
         </div>
@@ -92,6 +93,20 @@
                     </div>
                 </div>
                 <ul id="cooldown-list" class="student-list slim-scroll"></ul>
+            </div>
+        </section>
+        <section class="list-section history-section">
+            <div class="glass history-card p-4 h-100">
+                <div class="list-header history-header">
+                    <div>
+                        <h2 class="list-title">&#x70B9;&#x540D;&#x5386;&#x53F2;</h2>
+                        <p class="list-subtitle">&#x8BB0;&#x5F55;&#x62BD;&#x53D6;&#x7ED3;&#x679C;&#x3001;&#x65F6;&#x95F4;&#x4EE5;&#x53CA;&#x5907;&#x6CE8;</p>
+                    </div>
+                </div>
+                <div id="history-list" class="history-panel slim-scroll">
+                    <div class="history-empty" data-history-empty>&#x6682;&#x65E0;&#x5386;&#x53F2;&#x8BB0;&#x5F55;</div>
+                    <div id="history-groups" class="history-groups"></div>
+                </div>
             </div>
         </section>
     </div>

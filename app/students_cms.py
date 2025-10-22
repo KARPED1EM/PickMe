@@ -1,13 +1,142 @@
 ﻿import json
 import time
+import uuid
+from typing import Any
 
 from .student import Student
+
+
+class DrawHistoryEntry:
+    __slots__ = (
+        "entry_id",
+        "timestamp",
+        "mode",
+        "count",
+        "requested_count",
+        "ignore_cooldown",
+        "group",
+        "students",
+        "note",
+    )
+
+    _SUPPORTED_MODES = {"single", "group", "batch"}
+
+    def __init__(
+        self,
+        *,
+        entry_id: str | None = None,
+        timestamp: float | None = None,
+        mode: str = "single",
+        students: list[dict[str, Any]] | None = None,
+        group: int | None = None,
+        count: int | None = None,
+        requested_count: int | None = None,
+        ignore_cooldown: bool = False,
+        note: str = "",
+    ) -> None:
+        self.entry_id = (entry_id or uuid.uuid4().hex).strip()
+        self.timestamp = float(timestamp or time.time())
+        normalized_mode = str(mode or "single").lower()
+        if normalized_mode not in self._SUPPORTED_MODES:
+            normalized_mode = "single"
+        self.mode = normalized_mode
+        self.students = self._normalize_students(students)
+        self.group = self._normalize_group(group)
+        self.count = (
+            int(count)
+            if isinstance(count, (int, float))
+            else len(self.students)
+        )
+        self.requested_count = (
+            int(requested_count)
+            if isinstance(requested_count, (int, float))
+            else self.count
+        )
+        self.ignore_cooldown = bool(ignore_cooldown)
+        self.note = self._normalize_note(note)
+
+    @staticmethod
+    def _normalize_students(
+        candidates: list[dict[str, Any]] | None,
+    ) -> list[dict[str, Any]]:
+        if not isinstance(candidates, list):
+            return []
+        normalized: list[dict[str, Any]] = []
+        for item in candidates:
+            if not isinstance(item, dict):
+                continue
+            student_id = str(item.get("id") or item.get("student_id") or "").strip()
+            name = str(item.get("name") or "").strip()
+            try:
+                group_value = int(item.get("group", 0))
+            except (TypeError, ValueError):
+                group_value = 0
+            normalized.append(
+                {
+                    "id": student_id,
+                    "name": name,
+                    "group": group_value,
+                }
+            )
+        return normalized
+
+    @staticmethod
+    def _normalize_group(value: Any) -> int | None:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _normalize_note(value: Any) -> str:
+        return str(value or "").strip()
+
+    def serialize(self) -> dict[str, Any]:
+        payload = {
+            "id": self.entry_id,
+            "timestamp": self.timestamp,
+            "mode": self.mode,
+            "count": self.count,
+            "requested_count": self.requested_count,
+            "ignore_cooldown": self.ignore_cooldown,
+            "note": self.note,
+            "students": [dict(item) for item in self.students],
+        }
+        if self.group is not None:
+            payload["group"] = self.group
+        return payload
+
+    def update_note(self, note: str) -> None:
+        self.note = self._normalize_note(note)
+
+    @classmethod
+    def from_payload(cls, payload: Any) -> "DrawHistoryEntry":
+        if not isinstance(payload, dict):
+            raise ValueError("history_invalid")
+        timestamp_raw = payload.get("timestamp") or payload.get("time")
+        try:
+            timestamp_value = float(timestamp_raw)
+        except (TypeError, ValueError):
+            timestamp_value = time.time()
+        return cls(
+            entry_id=payload.get("id") or payload.get("entry_id"),
+            timestamp=timestamp_value,
+            mode=payload.get("mode") or payload.get("type") or "single",
+            students=payload.get("students") or payload.get("members"),
+            group=payload.get("group"),
+            count=payload.get("count"),
+            requested_count=payload.get("requested_count"),
+            ignore_cooldown=payload.get("ignore_cooldown"),
+            note=payload.get("note"),
+        )
 
 
 class StudentsCms:
     def __init__(self, pick_cooldown: int = 3) -> None:
         self.__students: dict[str, Student] = {}
         self.__pick_cooldown = pick_cooldown
+        self.__history: list[DrawHistoryEntry] = []
+        self.__history_updated_at: float = time.time()
 
     @staticmethod
     def __parse_int(value) -> int:
@@ -70,6 +199,84 @@ class StudentsCms:
 
     def get_students(self) -> list[Student]:
         return list(self.__students.values())
+
+    def history_entries(self) -> list[DrawHistoryEntry]:
+        return list(self.__history)
+
+    def record_history_entry(self, entry: DrawHistoryEntry) -> DrawHistoryEntry:
+        self.__history.insert(0, entry)
+        self.__sort_history()
+        self.__touch_history(entry.timestamp)
+        return entry
+
+    def update_history_note(self, entry_id: str, note: str) -> DrawHistoryEntry:
+        entry = self.__find_history_entry(entry_id)
+        if not entry:
+            raise KeyError("history_missing")
+        entry.update_note(note)
+        self.__touch_history()
+        return entry
+
+    def remove_history_record(self, entry_id: str) -> bool:
+        lookup = str(entry_id or "").strip()
+        if not lookup:
+            return False
+        for index, entry in enumerate(self.__history):
+            if entry.entry_id == lookup:
+                self.__history.pop(index)
+                self.__touch_history()
+                return True
+        return False
+
+    def export_history(self) -> dict[str, Any]:
+        return {
+            "entries": [entry.serialize() for entry in self.__history],
+            "updated_at": self.__history_updated_at,
+        }
+
+    def load_history(self, payload: Any) -> None:
+        data = payload if isinstance(payload, dict) else {}
+        raw_entries = []
+        if isinstance(payload, list):
+            raw_entries = payload
+        elif isinstance(data, dict):
+            raw_entries = data.get("entries") or []
+        entries: list[DrawHistoryEntry] = []
+        if isinstance(raw_entries, list):
+            for item in raw_entries:
+                try:
+                    entry = DrawHistoryEntry.from_payload(item)
+                except ValueError:
+                    continue
+                entries.append(entry)
+        self.__history = entries
+        self.__sort_history()
+        updated_at = time.time()
+        if isinstance(data, dict):
+            try:
+                updated_at = float(data.get("updated_at"))
+            except (TypeError, ValueError):
+                updated_at = time.time()
+        if not entries:
+            updated_at = time.time()
+        self.__history_updated_at = updated_at
+
+    def __find_history_entry(self, entry_id: str) -> DrawHistoryEntry | None:
+        lookup = str(entry_id or "").strip()
+        if not lookup:
+            return None
+        for entry in self.__history:
+            if entry.entry_id == lookup:
+                return entry
+        return None
+
+    def __sort_history(self) -> None:
+        self.__history.sort(key=lambda item: item.timestamp, reverse=True)
+
+    def __touch_history(self, timestamp: float | None = None) -> None:
+        now = time.time()
+        target = float(timestamp) if timestamp is not None else now
+        self.__history_updated_at = max(self.__history_updated_at, target, now)
 
     def set_pick_cooldown(self, days: int) -> None:
         self.__pick_cooldown = max(1, int(days))
@@ -184,12 +391,14 @@ class StudentsCms:
             "cooldown_days": self.__pick_cooldown,
             "students": items,
             "generated_at": current_time,
+            "history": self.export_history(),
         }
 
     def export(self) -> dict:
         return {
             "cooldown_days": self.__pick_cooldown,
             "students": [student.serialize() for student in self.__students.values()],
+            "history": self.export_history(),
         }
 
     def serialize(self) -> str:
@@ -211,12 +420,15 @@ class StudentsCms:
             raw = data
         else:
             raw = []
+        history_payload = None
         if isinstance(raw, dict):
             manager.__pick_cooldown = raw.get("cooldown_days", 3)
             students_data = raw.get("students", [])
+            history_payload = raw.get("history")
         else:
             students_data = raw
         for item in students_data:
             student = Student.deserialize(item)
             manager.add_student(student)
+        manager.load_history(history_payload)
         return manager

@@ -14,6 +14,7 @@ const dom = {
   resultName: $("result-name"),
   resultNote: $("result-note"),
   pickAny: $("pick-any"),
+  pickBatch: $("pick-batch"),
   pickGroup: $("pick-group"),
   ignoreCooldown: $("ignore-cooldown"),
   classSwitcher: $("class-switcher"),
@@ -22,12 +23,15 @@ const dom = {
   modalRoot: $("modal-root"),
   toast: $("toast"),
   resultCard: document.querySelector(".result-card"),
+  historyList: $("history-list"),
+  historyGroups: $("history-groups"),
+  historyEmpty: document.querySelector("[data-history-empty]"),
 };
 
 const STORAGE_MODE = window.__APP_STORAGE_MODE__ || "filesystem";
 const USE_BROWSER_STORAGE = STORAGE_MODE === "browser";
 const STORAGE_KEY = "pickme::payload";
-const DEFAULT_CLASS_NAME = "未命名班级";
+const DEFAULT_CLASS_NAME = "默认班级";
 
 const state = {
   app: null,
@@ -44,7 +48,10 @@ const state = {
   busy: false,
   isAnimating: false,
   lastSelection: null,
-  menuTarget: null,
+  history: [],
+  historyIndex: new Map(),
+  historyHighlightId: "",
+  contextTarget: null,
   historyStudentId: null,
   classDragSource: null,
 };
@@ -70,6 +77,17 @@ const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
   month: "2-digit",
   day: "2-digit",
 });
+
+const timeShortFormatter = new Intl.DateTimeFormat("zh-CN", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+const WEEKDAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+
+const HISTORY_MENU_ICON =
+  '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.25 8a1.25 1.25 0 1 1 2.5 0 1.25 1.25 0 0 1-2.5 0Zm3.75 0a1.25 1.25 0 1 1 2.5 0 1.25 1.25 0 0 1-2.5 0Zm3.75 0a1.25 1.25 0 1 1 2.5 0 1.25 1.25 0 0 1-2.5 0Z" fill="currentColor"/></svg>';
 
 init();
 
@@ -175,6 +193,9 @@ function buildPersistableState(normalized) {
 
 function bindEvents() {
   dom.pickAny.addEventListener("click", () => handleRandom("any"));
+  if (dom.pickBatch) {
+    dom.pickBatch.addEventListener("click", openBatchModal);
+  }
   dom.pickGroup.addEventListener("click", () => handleRandom("group"));
   dom.ignoreCooldown.addEventListener("change", event => {
     state.ignoreCooldown = event.target.checked;
@@ -192,6 +213,11 @@ function bindEvents() {
   }
   dom.studentList.addEventListener("contextmenu", handleContextTrigger);
   dom.cooldownList.addEventListener("contextmenu", handleContextTrigger);
+  if (dom.historyList) {
+    dom.historyList.addEventListener("contextmenu", handleHistoryContextTrigger);
+    dom.historyList.addEventListener("click", handleHistoryClick);
+    dom.historyList.addEventListener("scroll", closeContextMenu);
+  }
   document.addEventListener("click", handleGlobalClick);
   window.addEventListener("resize", closeContextMenu);
   dom.contextMenu.addEventListener("click", handleContextSelection);
@@ -241,6 +267,11 @@ function applyAppState(rawState) {
     state.payload.students.map(student => [student.id, student])
   );
   state.students = getSortedStudents(state.payload.students);
+  const historyData = state.payload.history || { entries: [] };
+  state.history = Array.isArray(historyData.entries) ? historyData.entries : [];
+  state.historyIndex = new Map(
+    state.history.map(entry => [entry.id, entry])
+  );
   syncSelection();
   const persistable = buildPersistableState(normalized);
   state.app = persistable;
@@ -252,6 +283,7 @@ function applyAppState(rawState) {
 function render() {
   renderStats();
   renderLists();
+  renderHistory();
   renderSelection();
   dom.ignoreCooldown.checked = state.ignoreCooldown;
   renderClassSwitcher();
@@ -265,7 +297,7 @@ function renderClassSwitcher() {
   if (!dom.classSwitcherLabel) {
     return;
   }
-  const name = state.currentClassName || "未命名班级";
+  const name = state.currentClassName || "默认班级";
   dom.classSwitcherLabel.textContent = name;
   if (dom.classSwitcher) {
     dom.classSwitcher.dataset.classId = state.currentClassId || "";
@@ -303,6 +335,122 @@ function renderLists() {
     : '<li class="empty-message">\u5f53\u524d\u6ca1\u6709\u5b66\u751f\u5904\u4e8e\u51b7\u5374</li>';
 }
 
+function renderHistory() {
+  if (!dom.historyList || !dom.historyGroups) {
+    return;
+  }
+  const entries = Array.isArray(state.history) ? state.history : [];
+  if (!entries.length) {
+    dom.historyGroups.innerHTML = "";
+    if (dom.historyEmpty) {
+      dom.historyEmpty.classList.remove("d-none");
+    }
+    return;
+  }
+  if (dom.historyEmpty) {
+    dom.historyEmpty.classList.add("d-none");
+  }
+  const groups = buildHistoryGroups(entries);
+  dom.historyGroups.innerHTML = groups.map(renderHistoryGroup).join("");
+  requestAnimationFrame(() => {
+    highlightHistoryEntry();
+  });
+}
+
+function buildHistoryGroups(entries) {
+  const sorted = entries.slice().sort((a, b) => b.timestamp - a.timestamp);
+  const dayMap = new Map();
+  for (const entry of sorted) {
+    const dayKey = buildHistoryDayKey(entry.timestamp);
+    let group = dayMap.get(dayKey);
+    if (!group) {
+      group = {
+        key: dayKey,
+        label: formatHistoryDayLabel(entry.timestamp),
+        order: entry.timestamp,
+        subgroups: new Map(),
+      };
+      dayMap.set(dayKey, group);
+    }
+    const period = resolveHistoryPeriod(entry.timestamp);
+    let bucket = group.subgroups.get(period.key);
+    if (!bucket) {
+      bucket = { key: period.key, label: period.label, entries: [] };
+      group.subgroups.set(period.key, bucket);
+    }
+    bucket.entries.push(entry);
+  }
+  return Array.from(dayMap.values())
+    .sort((a, b) => b.order - a.order)
+    .map(group => {
+      const subgroups = Array.from(group.subgroups.values());
+      if (subgroups.length <= 1) {
+        const entriesList = subgroups.length ? subgroups[0].entries : [];
+        return {
+          key: group.key,
+          label: group.label,
+          entries: entriesList,
+          subgroups: [],
+        };
+      }
+      return {
+        key: group.key,
+        label: group.label,
+        entries: [],
+        subgroups,
+      };
+    });
+}
+
+function renderHistoryGroup(group) {
+  const content = group.subgroups.length
+    ? group.subgroups.map(renderHistorySubgroup).join("")
+    : `<div class="history-entries">${group.entries
+        .map(renderHistoryEntry)
+        .join("")}</div>`;
+  return `<section class="history-group" data-history-group="${escapeHtml(group.key)}">
+    <div class="history-group-label">${escapeHtml(group.label)}</div>
+    ${content}
+  </section>`;
+}
+
+function renderHistorySubgroup(subgroup) {
+  return `<div class="history-subgroup" data-history-period="${escapeHtml(
+    subgroup.key
+  )}">
+    <div class="history-subgroup-label">${escapeHtml(subgroup.label)}</div>
+    <div class="history-entries">
+      ${subgroup.entries.map(renderHistoryEntry).join("")}
+    </div>
+  </div>`;
+}
+
+function renderHistoryEntry(entry) {
+  const modeLabel = describeHistoryMode(entry);
+  const names = formatHistoryNames(entry);
+  const meta = buildHistoryEntryMeta(entry);
+  const metaMarkup = `<div class="history-entry-meta">${meta.join("")}</div>`;
+  const noteMarkup = entry.note
+    ? `<div class="history-entry-note">${escapeHtml(entry.note)}</div>`
+    : "";
+  const menuButton = `<button type="button" class="history-entry-menu" data-history-menu="${escapeHtml(
+    entry.id
+  )}" aria-label="\u5907\u6ce8\u6216\u5220\u9664">${HISTORY_MENU_ICON}</button>`;
+  return `<article class="history-entry" data-entry-id="${escapeHtml(
+    entry.id
+  )}" data-history-mode="${escapeHtml(entry.mode)}">
+    <div class="history-entry-header">
+      <div class="history-entry-title">
+        <div class="history-entry-mode">${escapeHtml(modeLabel)}</div>
+        <div class="history-entry-names">${escapeHtml(names)}</div>
+      </div>
+      ${menuButton}
+    </div>
+    ${metaMarkup}
+    ${noteMarkup}
+  </article>`;
+}
+
 function renderStudentItem(student) {
   const color = groupColor(student.group);
   const cooldown = student.is_cooling
@@ -332,6 +480,131 @@ function renderStudentItem(student) {
 }
 
 
+
+function describeHistoryMode(entry) {
+  switch (entry && entry.mode) {
+    case "group":
+      return "抽取小组";
+    case "batch":
+      return "批量抽取";
+    default:
+      return "随机抽人";
+  }
+}
+
+function formatHistoryNames(entry) {
+  const students = Array.isArray(entry.students) ? entry.students : [];
+  const names = students
+    .map(student => (student && student.name ? student.name : ""))
+    .filter(Boolean);
+  if (!names.length) {
+    return "--";
+  }
+  if (entry.mode === "group" && Number.isFinite(entry.group)) {
+    return `第 ${entry.group} 组 · ${names.join("、")}`;
+  }
+  return names.join("、");
+}
+
+function buildHistoryEntryMeta(entry) {
+  const meta = [];
+  const absolute = formatTime(entry.timestamp);
+  const shortTime = timeShortFormatter.format(new Date(entry.timestamp * 1000));
+  const relative = formatSince(entry.timestamp);
+  meta.push(
+    `<span class="history-entry-tag" title="${escapeHtml(absolute)}">${escapeHtml(shortTime)} · ${escapeHtml(relative)}</span>`
+  );
+  if (entry.mode === "group" && Number.isFinite(entry.group)) {
+    meta.push(
+      `<span class="history-entry-tag">第 ${escapeHtml(String(entry.group))} 组</span>`
+    );
+  }
+  if (entry.mode === "batch") {
+    const count =
+      Number.isFinite(entry.count) && entry.count > 0
+        ? entry.count
+        : entry.students.length;
+    meta.push(`<span class="history-entry-tag">共 ${escapeHtml(String(count))} 人</span>`);
+  }
+  if (entry.ignore_cooldown) {
+    meta.push(`<span class="history-entry-tag">忽略冷却</span>`);
+  }
+  return meta;
+}
+
+function buildHistoryDayKey(timestamp) {
+  const date = new Date(timestamp * 1000);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function formatHistoryDayLabel(timestamp) {
+  const target = new Date(timestamp * 1000);
+  const diff = Math.round((startOfDay(new Date()) - startOfDay(target)) / 86400000);
+  if (diff === 0) {
+    return "今天";
+  }
+  if (diff === 1) {
+    return "昨天";
+  }
+  if (diff === 2) {
+    return "前天";
+  }
+  const month = target.getMonth() + 1;
+  const day = target.getDate();
+  const weekday = WEEKDAY_LABELS[target.getDay()];
+  return `${month}月${day}日 ${weekday}`;
+}
+
+function resolveHistoryPeriod(timestamp) {
+  const hour = new Date(timestamp * 1000).getHours();
+  if (hour < 6) {
+    return { key: "dawn", label: "清晨" };
+  }
+  if (hour < 12) {
+    return { key: "morning", label: "上午" };
+  }
+  if (hour < 18) {
+    return { key: "afternoon", label: "下午" };
+  }
+  return { key: "evening", label: "晚间" };
+}
+
+function highlightHistoryEntry() {
+  if (!state.historyHighlightId || !dom.historyList) {
+    return;
+  }
+
+
+function getHistoryEntryById(entryId) {
+  if (!entryId) {
+    return null;
+  }
+  const key = String(entryId);
+  if (state.historyIndex instanceof Map && state.historyIndex.has(key)) {
+    return state.historyIndex.get(key) || null;
+  }
+  if (Array.isArray(state.history)) {
+    const match = state.history.find(item => item.id === key);
+    if (match) {
+      return match;
+    }
+  }
+  return null;
+}
+  const selector = `[data-entry-id="${escapeCssIdentifier(state.historyHighlightId)}"]`;
+  const element = dom.historyList.querySelector(selector);
+  if (element) {
+    element.classList.add("is-highlight");
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => {
+      element.classList.remove("is-highlight");
+    }, 1400);
+  }
+  state.historyHighlightId = "";
+}
+
 function renderCooldownItem(student) {
   const color = groupColor(student.group);
   const remaining = `\u5269\u4f59 ${formatDuration(student.remaining_cooldown)}`;
@@ -356,50 +629,79 @@ function renderCooldownItem(student) {
 function renderSelection() {
   if (!state.lastSelection) {
     dom.resultName.textContent = "--";
-    dom.resultNote.textContent = "\u7b49\u5f85\u62bd\u53d6";
+    dom.resultNote.textContent = "等待抽取";
     return;
   }
-  if (state.lastSelection.type === "single") {
-    const id = state.lastSelection.ids[0];
-    const student = state.studentsMap.get(id);
-    if (student) {
-      state.lastSelection.name = student.name;
-      state.lastSelection.group = student.group;
-    }
-    const name = state.lastSelection.name || "--";
-    const groupValue = Number.isFinite(state.lastSelection.group)
-      ? state.lastSelection.group
-      : null;
-    dom.resultName.textContent = name;
-    dom.resultNote.textContent = groupValue !== null
-      ? `\u6765\u81ea\u7b2c ${groupValue} \u7ec4`
-      : "\u968f\u673a\u62bd\u53d6";
-  } else {
-    const names = [];
-    let groupValue = Number.isFinite(state.lastSelection.group)
-      ? state.lastSelection.group
-      : null;
-    for (const id of state.lastSelection.ids) {
+  const selection = state.lastSelection;
+  switch (selection.type) {
+    case "single": {
+      const id = selection.ids[0];
       const student = state.studentsMap.get(id);
       if (student) {
-        names.push(student.name);
-        groupValue = student.group;
+        selection.name = student.name;
+        selection.group = student.group;
       }
+      const name = selection.name || "--";
+      const groupValue = Number.isFinite(selection.group)
+        ? selection.group
+        : null;
+      dom.resultName.textContent = name;
+      dom.resultNote.textContent = groupValue !== null
+        ? `来自第 ${groupValue} 组`
+        : "随机抽取";
+      break;
     }
-    if (!names.length && Array.isArray(state.lastSelection.names)) {
-      names.push(...state.lastSelection.names);
-    } else {
-      state.lastSelection.names = names.slice();
+    case "batch": {
+      const ids = Array.isArray(selection.ids) ? selection.ids : [];
+      const names = [];
+      for (const id of ids) {
+        const student = state.studentsMap.get(id);
+        if (student) {
+          names.push(student.name);
+        }
+      }
+      if (!names.length && Array.isArray(selection.names)) {
+        names.push(...selection.names);
+      } else {
+        selection.names = names.slice();
+      }
+      dom.resultName.textContent = names.length ? names.join("、") : "--";
+      const count = ids.length || names.length;
+      dom.resultNote.textContent = count
+        ? `批量抽取 · 共 ${count} 人`
+        : "批量抽取";
+      break;
     }
-    state.lastSelection.group = groupValue;
-    dom.resultName.textContent = groupValue !== null
-      ? `\u7b2c ${groupValue} \u7ec4`
-      : "\u5c0f\u7ec4\u62bd\u53d6";
-    dom.resultNote.textContent = names.length
-      ? names.join("\u3001")
-      : "\u6210\u5458\u5df2\u52a0\u5165\u51b7\u5374";
+    case "group":
+    default: {
+      const names = [];
+      let groupValue = Number.isFinite(selection.group)
+        ? selection.group
+        : null;
+      for (const id of selection.ids) {
+        const student = state.studentsMap.get(id);
+        if (student) {
+          names.push(student.name);
+          groupValue = student.group;
+        }
+      }
+      if (!names.length && Array.isArray(selection.names)) {
+        names.push(...selection.names);
+      } else {
+        selection.names = names.slice();
+      }
+      selection.group = groupValue;
+      dom.resultName.textContent = groupValue !== null
+        ? `第 ${groupValue} 组`
+        : "小组抽取";
+      dom.resultNote.textContent = names.length
+        ? names.join("、")
+        : "成员已加入冷却";
+      break;
+    }
   }
 }
+
 
 function resetSelection() {
   state.lastSelection = null;
@@ -409,6 +711,9 @@ function resetSelection() {
 function updateControls() {
   const disabled = state.busy || state.isAnimating;
   dom.pickAny.disabled = disabled;
+  if (dom.pickBatch) {
+    dom.pickBatch.disabled = disabled;
+  }
   dom.pickGroup.disabled = disabled;
   dom.clearCooldown.disabled = disabled;
   dom.addStudent.disabled = disabled;
@@ -910,7 +1215,63 @@ function handleContextTrigger(event) {
   if (!student) {
     return;
   }
-  openContextMenu(student, event.clientX, event.clientY);
+  openStudentContextMenu(student, event.clientX, event.clientY);
+}
+
+function openStudentContextMenu(student, x, y) {
+  const items = [
+    { action: "edit", label: "\u67e5\u770b\u8be6\u60c5" },
+    student.is_cooling
+      ? { action: "release", label: "\u89e3\u9664\u51b7\u5374" }
+      : { action: "force", label: "\u5f3a\u5236\u51b7\u5374" },
+  ];
+  openContextMenu({ type: "student", id: student.id }, items, x, y);
+}
+
+function handleHistoryContextTrigger(event) {
+  const item = event.target.closest("[data-entry-id]");
+  if (!item) {
+    return;
+  }
+  event.preventDefault();
+  if (state.busy || state.isAnimating) {
+    return;
+  }
+  const entryId = item.dataset.entryId;
+  const entry = getHistoryEntryById(entryId);
+  if (!entry) {
+    return;
+  }
+  openHistoryContextMenu(entry, event.clientX, event.clientY);
+}
+
+function handleHistoryClick(event) {
+  const button = event.target.closest("[data-history-menu]");
+  if (!button) {
+    return;
+  }
+  event.preventDefault();
+  if (state.busy || state.isAnimating) {
+    return;
+  }
+  const entryId = button.dataset.historyMenu;
+  const entry = getHistoryEntryById(entryId);
+  if (!entry) {
+    return;
+  }
+  const rect = button.getBoundingClientRect();
+  openHistoryContextMenu(entry, rect.left + rect.width / 2, rect.bottom + 6);
+}
+
+function openHistoryContextMenu(entry, x, y) {
+  const items = [
+    {
+      action: "history-note",
+      label: entry.note ? "\u7f16\u8f91\u5907\u6ce8" : "\u6dfb\u52a0\u5907\u6ce8",
+    },
+    { action: "history-delete", label: "\u5220\u9664\u8bb0\u5f55", tone: "danger" },
+  ];
+  openContextMenu({ type: "history", id: entry.id }, items, x, y);
 }
 
 function handleGlobalClick(event) {
@@ -928,25 +1289,45 @@ function handleContextSelection(event) {
     return;
   }
   const action = button.dataset.action;
-  const id = state.menuTarget;
+  const target = state.contextTarget;
   closeContextMenu();
-  if (!id) {
+  if (!target) {
     return;
   }
-  if (action === "edit") {
-    openStudentModal("edit", id);
+  if (target.type === "student") {
+    const id = target.id;
+    if (!id) {
+      return;
+    }
+    if (action === "edit") {
+      openStudentModal("edit", id);
+      return;
+    }
+    if (action === "force") {
+      runSimpleAction("student_force_cooldown", { student_id: id }, "\u5df2\u6807\u8bb0\u51b7\u5374");
+      return;
+    }
+    if (action === "release") {
+      runSimpleAction(
+        "student_release_cooldown",
+        { student_id: id },
+        "\u5df2\u89e3\u9664\u51b7\u5374"
+      );
+    }
     return;
   }
-  if (action === "force") {
-    runSimpleAction("student_force_cooldown", { student_id: id }, "\u5df2\u6807\u8bb0\u51b7\u5374");
-    return;
-  }
-  if (action === "release") {
-    runSimpleAction(
-      "student_release_cooldown",
-      { student_id: id },
-      "\u5df2\u89e3\u9664\u51b7\u5374"
-    );
+  if (target.type === "history") {
+    const entry = getHistoryEntryById(target.id);
+    if (!entry) {
+      return;
+    }
+    if (action === "history-note") {
+      openHistoryNoteModal(entry);
+      return;
+    }
+    if (action === "history-delete") {
+      handleHistoryDelete(entry);
+    }
   }
 }
 
@@ -989,19 +1370,16 @@ async function runSimpleAction(action, payload, message) {
   }
 }
 
-function openContextMenu(student, x, y) {
+function openContextMenu(target, items, x, y) {
+  if (!items || !items.length) {
+    return;
+  }
   closeContextMenu();
-  const entries = [
-    { action: "edit", label: "\u67e5\u770b\u8be6\u60c5" },
-    student.is_cooling
-      ? { action: "release", label: "\u89e3\u9664\u51b7\u5374" }
-      : { action: "force", label: "\u5f3a\u5236\u51b7\u5374" },
-  ];
-  dom.contextMenu.innerHTML = entries
-    .map(
-      item =>
-        `<button type="button" class="context-item" data-action="${item.action}">${item.label}</button>`
-    )
+  dom.contextMenu.innerHTML = items
+    .map(item => {
+      const toneClass = item.tone === "danger" ? " is-danger" : "";
+      return `<button type="button" class="context-item${toneClass}" data-action="${item.action}">${item.label}</button>`;
+    })
     .join("");
   dom.contextMenu.style.left = "0px";
   dom.contextMenu.style.top = "0px";
@@ -1015,11 +1393,11 @@ function openContextMenu(student, x, y) {
     dom.contextMenu.style.top = `${posY}px`;
     dom.contextMenu.style.opacity = "1";
   });
-  state.menuTarget = student.id;
+  state.contextTarget = target;
 }
 
 function closeContextMenu() {
-  state.menuTarget = null;
+  state.contextTarget = null;
   dom.contextMenu.classList.add("d-none");
   dom.contextMenu.style.opacity = "";
 }
@@ -1083,6 +1461,197 @@ function openStudentModal(mode, studentId) {
     idInput.select();
   }
 }
+
+function openHistoryNoteModal(entry) {
+  if (state.busy || state.isAnimating) {
+    return;
+  }
+  closeContextMenu();
+  const content = buildHistoryNoteModal(entry);
+  showModal(content);
+  const form = dom.modalRoot.querySelector("#history-note-form");
+  const textarea = dom.modalRoot.querySelector("#history-note-text");
+  const closers = dom.modalRoot.querySelectorAll("[data-modal-close]");
+  closers.forEach(button => button.addEventListener("click", closeModal));
+  if (form) {
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      const value = textarea ? textarea.value.trim() : "";
+      if (value.length > 200) {
+        showToast("备注最多 200 字");
+        if (textarea) {
+          textarea.focus();
+        }
+        return;
+      }
+      submitHistoryNote(entry.id, value);
+    });
+  }
+  if (textarea) {
+    textarea.focus();
+    textarea.select();
+  }
+}
+
+function buildHistoryNoteModal(entry) {
+  const title = entry.note ? "编辑备注" : "添加备注";
+  const noteValue = entry.note ? escapeHtml(entry.note) : "";
+  return `<div class="modal-backdrop">
+    <div class="modal-panel glass">
+      <div class="modal-header">
+        <h3>${escapeHtml(title)}</h3>
+        <button type="button" class="btn btn-icon" data-modal-close aria-label="关闭">×</button>
+      </div>
+      <form id="history-note-form">
+        <div class="modal-body slim-scroll">
+          <p class="text-muted">备注仅用于记录课堂细节，不会影响统计结果。</p>
+          <div class="mb-3">
+            <label class="form-label" for="history-note-text">备注内容</label>
+            <textarea id="history-note-text" class="form-control" rows="4" maxlength="200" placeholder="写点想说的话..." autocomplete="off">${noteValue}</textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-light" data-modal-close>取消</button>
+          <button type="submit" class="btn btn-accent">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+}
+
+async function submitHistoryNote(entryId, note) {
+  if (state.busy) {
+    return;
+  }
+  setBusy(true);
+  try {
+    const response = await sendAction("history_entry_note", {
+      entry_id: entryId,
+      note,
+    });
+    applyAppState(response.state);
+    state.historyHighlightId = entryId;
+    render();
+    closeModal();
+    showToast("备注已保存");
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    if (!state.isAnimating) {
+      setBusy(false);
+    }
+  }
+}
+
+async function handleHistoryDelete(entry) {
+  const names = formatHistoryNames(entry);
+  const message = names && names !== "--"
+    ? `确定删除「${names}」的记录吗？`
+    : "确定删除这条记录吗？";
+  const confirmed = await openConfirmModal({
+    title: "删除历史记录",
+    message,
+    confirmLabel: "删除",
+    confirmTone: "danger",
+  });
+  if (!confirmed || state.busy) {
+    return;
+  }
+  setBusy(true);
+  try {
+    const response = await sendAction("history_entry_delete", { entry_id: entry.id });
+    applyAppState(response.state);
+    render();
+    showToast("已删除历史记录");
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    if (!state.isAnimating) {
+      setBusy(false);
+    }
+  }
+}
+
+function openBatchModal() {
+  if (state.busy || state.isAnimating) {
+    return;
+  }
+  closeContextMenu();
+  const available = state.ignoreCooldown
+    ? state.students.length
+    : state.students.filter(student => !student.is_cooling).length;
+  if (!available) {
+    showToast("当前没有可抽取的学生");
+    return;
+  }
+  const content = buildBatchModal(available, state.ignoreCooldown);
+  showModal(content);
+  const form = dom.modalRoot.querySelector("#batch-form");
+  const input = dom.modalRoot.querySelector("#batch-count");
+  const closers = dom.modalRoot.querySelectorAll("[data-modal-close]");
+  closers.forEach(button => button.addEventListener("click", closeModal));
+  if (form) {
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      if (!input) {
+        return;
+      }
+      const value = Number(input.value);
+      if (!Number.isFinite(value) || value < 1) {
+        showToast("请输入正确的抽取人数");
+        input.focus();
+        input.select();
+        return;
+      }
+      if (value > available) {
+        showToast("人数超过可抽取范围");
+        input.focus();
+        input.select();
+        return;
+      }
+      closeModal();
+      handleRandom("batch", { count: value });
+    });
+  }
+  if (input) {
+    const lastCount =
+      state.lastSelection && state.lastSelection.type === "batch"
+        ? state.lastSelection.ids.length
+        : 2;
+    const defaultValue = Math.min(available, Math.max(1, lastCount));
+    input.value = defaultValue;
+    input.focus();
+    input.select();
+  }
+}
+
+function buildBatchModal(available, ignoringCooldown) {
+  const hint = ignoringCooldown
+    ? `当前忽略冷却，共 ${available} 人可抽取。`
+    : `当前有 ${available} 人符合冷却规则。`;
+  return `<div class="modal-backdrop">
+    <div class="modal-panel glass">
+      <div class="modal-header">
+        <h3>批量抽取</h3>
+        <button type="button" class="btn btn-icon" data-modal-close aria-label="关闭">×</button>
+      </div>
+      <form id="batch-form">
+        <div class="modal-body slim-scroll">
+          <p class="text-muted">${escapeHtml(hint)}</p>
+          <div class="mb-3">
+            <label class="form-label" for="batch-count">抽取人数</label>
+            <input id="batch-count" name="count" type="number" min="1" max="${available}" class="form-control" required autocomplete="off">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-light" data-modal-close>取消</button>
+          <button type="submit" class="btn btn-accent">开始抽取</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+}
+
 
 function bindModalBackdrop(onClose) {
   unbindModalBackdrop();
@@ -1682,7 +2251,7 @@ async function handleStudentDelete(student) {
   }
 }
 
-async function handleRandom(mode) {
+async function handleRandom(mode, extra = {}) {
   if (state.busy || state.isAnimating) {
     return;
   }
@@ -1692,9 +2261,17 @@ async function handleRandom(mode) {
     const response = await sendAction("random_pick", {
       mode,
       ignore_cooldown: state.ignoreCooldown,
+      ...extra,
     });
+    const historyEntryId =
+      response && response.result && response.result.history_entry_id
+        ? String(response.result.history_entry_id)
+        : "";
     await runSelectionAnimation(response.result);
     applyAppState(response.state);
+    if (historyEntryId) {
+      state.historyHighlightId = historyEntryId;
+    }
     render();
   } catch (error) {
     showToast(error.message);
@@ -1720,14 +2297,18 @@ function runSelectionAnimation(result) {
     return Promise.resolve();
   }
   const type = result.type || "single";
-  const finalIds =
-    type === "group"
-      ? Array.isArray(result.student_ids)
-        ? result.student_ids.filter(Boolean)
-        : []
-      : result.student_id
-      ? [result.student_id]
+  let finalIds = [];
+  if (type === "group") {
+    finalIds = Array.isArray(result.student_ids)
+      ? result.student_ids.filter(Boolean)
       : [];
+  } else if (type === "batch") {
+    finalIds = Array.isArray(result.student_ids)
+      ? result.student_ids.filter(Boolean)
+      : [];
+  } else if (result.student_id) {
+    finalIds = [result.student_id];
+  }
   if (!finalIds.length) {
     resetSelection();
     return Promise.resolve();
@@ -1749,14 +2330,14 @@ function runSelectionAnimation(result) {
   state.isAnimating = true;
   updateControls();
   dom.resultCard.classList.add("is-animating");
-  dom.resultNote.textContent = "\u6b63\u5728\u62bd\u53d6...";
+  dom.resultNote.textContent = "正在抽取...";
   let index = 0;
   let showFrame;
   if (type === "group") {
     showFrame = value => {
       const numeric = Number(value);
       dom.resultName.textContent = Number.isFinite(numeric)
-        ? `\u7b2c ${numeric} \u7ec4`
+        ? `第 ${numeric} 组`
         : "--";
     };
   } else {
@@ -1804,7 +2385,6 @@ function runSelectionAnimation(result) {
   });
 }
 
-
 function finalizeSelection(type, finalIds, result) {
   if (type === "group") {
     const names = [];
@@ -1822,17 +2402,35 @@ function finalizeSelection(type, finalIds, result) {
       group: groupValue,
       names,
     };
-  } else {
-    const id = finalIds[0];
-    const student = state.studentsMap.get(id);
-    state.lastSelection = {
-      type: "single",
-      ids: [id],
-      name: student ? student.name : null,
-      group: student ? student.group : Number.isFinite(result.group) ? result.group : null,
-    };
+    return;
   }
+  if (type === "batch") {
+    const names = [];
+    for (const id of finalIds) {
+      const student = state.studentsMap.get(id);
+      if (student) {
+        names.push(student.name);
+      }
+    }
+    state.lastSelection = {
+      type: "batch",
+      ids: finalIds,
+      names,
+      count: finalIds.length,
+    };
+    return;
+  }
+  const id = finalIds[0];
+  const student = state.studentsMap.get(id);
+  state.lastSelection = {
+    type: "single",
+    ids: finalIds,
+    name: student ? student.name : "",
+    group: student ? student.group : null,
+  };
 }
+
+
 function buildAnimationSequence(pool, finalIds) {
   const base = Array.from(new Set([...pool.filter(Boolean), ...finalIds]));
   if (!base.length) {
@@ -1943,30 +2541,43 @@ function syncSelection() {
   if (!state.lastSelection) {
     return;
   }
-  if (state.lastSelection.type === "single") {
-    const id = state.lastSelection.ids[0];
+  const selection = state.lastSelection;
+  if (selection.type === "single") {
+    const id = selection.ids[0];
     if (!state.studentsMap.has(id)) {
       return;
     }
     const student = state.studentsMap.get(id);
-    state.lastSelection.name = student.name;
-    state.lastSelection.group = student.group;
-  } else {
+    selection.name = student.name;
+    selection.group = student.group;
+    return;
+  }
+  if (selection.type === "batch") {
     const names = [];
-    let groupValue = Number.isFinite(state.lastSelection.group)
-      ? state.lastSelection.group
-      : null;
-    for (const id of state.lastSelection.ids) {
+    for (const id of selection.ids) {
+      const student = state.studentsMap.get(id);
+      if (student) {
+        names.push(student.name);
+      }
+    }
+    selection.names = names;
+    return;
+  }
+  if (selection.type === "group") {
+    const names = [];
+    let groupValue = Number.isFinite(selection.group) ? selection.group : null;
+    for (const id of selection.ids) {
       const student = state.studentsMap.get(id);
       if (student) {
         names.push(student.name);
         groupValue = student.group;
       }
     }
-    state.lastSelection.names = names;
-    state.lastSelection.group = groupValue;
+    selection.names = names;
+    selection.group = groupValue;
   }
 }
+
 
 function getSortedStudents(students) {
   const list = students.slice();
@@ -2041,7 +2652,7 @@ function normalizeAppState(raw) {
       : "";
   if (!currentClass.name) {
     const metaMatch = normalizedClasses.find(item => item.id === currentClass.id);
-    currentClass.name = metaMatch ? metaMatch.name : "未命名班级";
+    currentClass.name = metaMatch ? metaMatch.name : "默认班级";
   }
   let payloadCandidate = currentClass.payload;
   if (!payloadCandidate || typeof payloadCandidate !== "object") {
@@ -2104,7 +2715,7 @@ function normalizeClassMeta(entry, index) {
   const name =
     typeof item.name === "string" && item.name.trim()
       ? item.name.trim()
-      : "未命名班级";
+      : "默认班级";
   const toNumber = (value, fallback = 0) => {
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : fallback;
@@ -2126,10 +2737,85 @@ function normalizePayload(raw) {
   const students = Array.isArray(source.students)
     ? source.students.map(normalizeStudent)
     : [];
+  const history = normalizeHistoryData(source.history);
   return {
     cooldown_days: Math.max(1, Number(source.cooldown_days) || 1),
     students,
     generated_at: Number(source.generated_at) || Date.now() / 1000,
+    history,
+  };
+}
+
+function normalizeHistoryData(raw) {
+  const container = raw && typeof raw === "object" ? raw : {};
+  let entriesSource = container.entries;
+  if (!Array.isArray(entriesSource) && Array.isArray(raw)) {
+    entriesSource = raw;
+  }
+  const entries = Array.isArray(entriesSource)
+    ? entriesSource
+        .map(normalizeHistoryEntry)
+        .filter(entry => entry !== null)
+    : [];
+  let updatedAt = Number(container.updated_at);
+  if (!Number.isFinite(updatedAt) || updatedAt <= 0) {
+    updatedAt = Date.now() / 1000;
+  }
+  return {
+    entries,
+    updated_at: updatedAt,
+  };
+}
+
+function normalizeHistoryEntry(entry) {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+  const id = entry.id || entry.entry_id;
+  const timestamp = Number(entry.timestamp);
+  if (!id || !Number.isFinite(timestamp) || timestamp <= 0) {
+    return null;
+  }
+  const mode = typeof entry.mode === "string" ? entry.mode.toLowerCase() : "single";
+  const students = Array.isArray(entry.students)
+    ? entry.students
+        .map(normalizeHistoryStudent)
+        .filter(student => student !== null)
+    : [];
+  let group = Number(entry.group);
+  if (!Number.isFinite(group)) {
+    group = null;
+  }
+  const count = Number(entry.count);
+  const requested = Number(entry.requested_count);
+  const note = typeof entry.note === "string" ? entry.note.trim() : "";
+  return {
+    id: String(id),
+    timestamp,
+    mode,
+    students,
+    group,
+    count: Number.isFinite(count) ? count : students.length,
+    requested_count: Number.isFinite(requested) ? requested : null,
+    ignore_cooldown: Boolean(entry.ignore_cooldown),
+    note,
+  };
+}
+
+function normalizeHistoryStudent(student) {
+  if (!student || typeof student !== "object") {
+    return null;
+  }
+  const id = String(student.id || student.student_id || "");
+  const name = String(student.name || "").trim();
+  let group = Number(student.group);
+  if (!Number.isFinite(group)) {
+    group = null;
+  }
+  return {
+    id,
+    name,
+    group,
   };
 }
 
@@ -2232,6 +2918,19 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function escapeCssIdentifier(value) {
+  const source = String(value || "");
+  if (window.CSS && typeof window.CSS.escape === "function") {
+    return window.CSS.escape(source);
+  }
+  return source.replace(/[^a-zA-Z0-9_-]/g, match => `\\${match}`);
+}
+
+function startOfDay(date) {
+  const target = date instanceof Date ? date : new Date(date);
+  return new Date(target.getFullYear(), target.getMonth(), target.getDate());
 }
 
 function buildDomId(prefix, value) {

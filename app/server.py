@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .classrooms import ClassroomsState
+from .students_cms import DrawHistoryEntry
 from .storage import create_storage_backend
 
 ERROR_TEXT = {
@@ -26,6 +27,9 @@ ERROR_TEXT = {
     "no_groups_available": "没有可抽取的小组",
     "unsupported_action": "不支持的操作",
     "unsupported_random_mode": "不支持的抽取模式",
+    "batch_count_invalid": "抽取人数至少需要 1 人",
+    "batch_count_exceeds_available": "可抽取人数不足",
+    "history_note_too_long": "备注太长",
     "cooldown_invalid": "冷却时间必须至少为 1 天",
     "action_missing": "缺少操作指令",
     "class_missing": "未找到指定班级",
@@ -44,13 +48,10 @@ def create_app(
 ) -> FastAPI:
     base_dir = Path(__file__).resolve().parent
     templates = Jinja2Templates(directory=str(base_dir / "templates"))
-
     app = FastAPI()
-
     static_dir = base_dir / "static"
     if static_dir.exists():
         app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-
     storage = create_storage_backend(storage_mode, user_data_dir, default_data_dir)
     app.state.storage = storage
 
@@ -100,11 +101,26 @@ def create_app(
             raise ValueError("no_students_available")
         chosen = random.choice(students)
         cms.register_random_pick([chosen])
+        entry = cms.record_history_entry(
+            DrawHistoryEntry(
+                mode="single",
+                students=[
+                    {
+                        "id": chosen.student_id,
+                        "name": chosen.name,
+                        "group": chosen.group,
+                    }
+                ],
+                requested_count=1,
+                ignore_cooldown=ignore_cooldown,
+            )
+        )
         result = {
             "type": "student",
             "class_id": state.current_class_id,
             "student_id": chosen.student_id,
             "pool_ids": [student.student_id for student in students],
+            "history_entry_id": entry.entry_id,
         }
         return build_response(state, result=result, persist=True, touch="modified")
 
@@ -124,16 +140,79 @@ def create_app(
         if not members:
             raise ValueError("no_students_available")
         cms.register_random_pick(members)
+        entry = cms.record_history_entry(
+            DrawHistoryEntry(
+                mode="group",
+                students=[
+                    {
+                        "id": member.student_id,
+                        "name": member.name,
+                        "group": member.group,
+                    }
+                    for member in members
+                ],
+                group=group_value,
+                requested_count=len(members),
+                ignore_cooldown=ignore_cooldown,
+            )
+        )
         result = {
             "type": "group",
             "class_id": state.current_class_id,
             "group": group_value,
             "student_ids": [student.student_id for student in members],
             "pool_ids": [student.student_id for student in members],
+            "history_entry_id": entry.entry_id,
         }
         return build_response(state, result=result, persist=True, touch="modified")
 
-    def handle_set_cooldown(state: ClassroomsState, data: dict[str, Any]) -> JSONResponse:
+    def run_batch_random(
+        state: ClassroomsState,
+        ignore_cooldown: bool,
+        requested_count: int,
+    ) -> JSONResponse:
+        cms = state.current_cms
+        try:
+            count = int(requested_count)
+        except (TypeError, ValueError):
+            raise ValueError("batch_count_invalid")
+        if count < 1:
+            raise ValueError("batch_count_invalid")
+        students = cms.eligible_students(ignore_cooldown=ignore_cooldown)
+        if not students:
+            raise ValueError("no_students_available")
+        if count > len(students):
+            raise ValueError("batch_count_exceeds_available")
+        chosen = random.sample(students, count)
+        cms.register_random_pick(chosen)
+        entry = cms.record_history_entry(
+            DrawHistoryEntry(
+                mode="batch",
+                students=[
+                    {
+                        "id": student.student_id,
+                        "name": student.name,
+                        "group": student.group,
+                    }
+                    for student in chosen
+                ],
+                requested_count=count,
+                ignore_cooldown=ignore_cooldown,
+            )
+        )
+        result = {
+            "type": "batch",
+            "class_id": state.current_class_id,
+            "student_ids": [student.student_id for student in chosen],
+            "pool_ids": [student.student_id for student in students],
+            "requested_count": count,
+            "history_entry_id": entry.entry_id,
+        }
+        return build_response(state, result=result, persist=True, touch="modified")
+
+    def handle_set_cooldown(
+        state: ClassroomsState, data: dict[str, Any]
+    ) -> JSONResponse:
         try:
             days = int(data.get("days"))
         except (TypeError, ValueError):
@@ -149,7 +228,9 @@ def create_app(
             touch="modified",
         )
 
-    def handle_clear_cooldown(state: ClassroomsState, data: dict[str, Any]) -> JSONResponse:
+    def handle_clear_cooldown(
+        state: ClassroomsState, data: dict[str, Any]
+    ) -> JSONResponse:
         cms = state.current_cms
         cms.clear_all_cooldowns()
         return build_response(
@@ -159,16 +240,22 @@ def create_app(
             touch="modified",
         )
 
-    def handle_random_pick(state: ClassroomsState, data: dict[str, Any]) -> JSONResponse:
+    def handle_random_pick(
+        state: ClassroomsState, data: dict[str, Any]
+    ) -> JSONResponse:
         mode = str(data.get("mode") or "any").lower()
         ignore_cooldown = bool(data.get("ignore_cooldown"))
-        if mode == "any":
+        if mode in {"any", "single", "student"}:
             return run_single_random(state, ignore_cooldown)
+        if mode == "batch":
+            return run_batch_random(state, ignore_cooldown, data.get("count"))
         if mode == "group":
             return run_group_random(state, ignore_cooldown)
         raise ValueError("unsupported_random_mode")
 
-    def handle_student_create(state: ClassroomsState, data: dict[str, Any]) -> JSONResponse:
+    def handle_student_create(
+        state: ClassroomsState, data: dict[str, Any]
+    ) -> JSONResponse:
         cms = state.current_cms
         name = data.get("name")
         group = data.get("group")
@@ -185,7 +272,9 @@ def create_app(
             touch="modified",
         )
 
-    def handle_student_delete(state: ClassroomsState, data: dict[str, Any]) -> JSONResponse:
+    def handle_student_delete(
+        state: ClassroomsState, data: dict[str, Any]
+    ) -> JSONResponse:
         cms = state.current_cms
         student_id = str(data.get("student_id") or "").strip()
         if not student_id:
@@ -203,7 +292,9 @@ def create_app(
             touch="modified",
         )
 
-    def handle_student_update(state: ClassroomsState, data: dict[str, Any]) -> JSONResponse:
+    def handle_student_update(
+        state: ClassroomsState, data: dict[str, Any]
+    ) -> JSONResponse:
         cms = state.current_cms
         student_id = str(data.get("student_id") or "").strip()
         if not student_id:
@@ -318,7 +409,52 @@ def create_app(
             touch="modified",
         )
 
-    def handle_class_switch(state: ClassroomsState, data: dict[str, Any]) -> JSONResponse:
+    def handle_history_note(
+        state: ClassroomsState, data: dict[str, Any]
+    ) -> JSONResponse:
+        cms = state.current_cms
+        entry_id = str(data.get("entry_id") or "").strip()
+        if not entry_id:
+            raise ValueError("history_missing")
+        note_raw = data.get("note", "")
+        note_value = str(note_raw or "").strip()
+        if len(note_value) > 200:
+            raise ValueError("history_note_too_long")
+        entry = cms.update_history_note(entry_id, note_value)
+        return build_response(
+            state,
+            result={
+                "type": "history_note",
+                "class_id": state.current_class_id,
+                "entry": entry.serialize(),
+            },
+            persist=True,
+            touch="modified",
+        )
+
+    def handle_history_delete(
+        state: ClassroomsState, data: dict[str, Any]
+    ) -> JSONResponse:
+        cms = state.current_cms
+        entry_id = str(data.get("entry_id") or "").strip()
+        if not entry_id:
+            raise ValueError("history_missing")
+        if not cms.remove_history_record(entry_id):
+            raise ValueError("history_missing")
+        return build_response(
+            state,
+            result={
+                "type": "history_delete",
+                "class_id": state.current_class_id,
+                "entry_id": entry_id,
+            },
+            persist=True,
+            touch="modified",
+        )
+
+    def handle_class_switch(
+        state: ClassroomsState, data: dict[str, Any]
+    ) -> JSONResponse:
         class_id = str(data.get("class_id") or "").strip()
         if not class_id:
             raise ValueError("class_missing")
@@ -330,11 +466,15 @@ def create_app(
             touch=None,
         )
 
-    def handle_class_create(state: ClassroomsState, data: dict[str, Any]) -> JSONResponse:
+    def handle_class_create(
+        state: ClassroomsState, data: dict[str, Any]
+    ) -> JSONResponse:
         name = str(data.get("name") or "").strip()
         if not name:
             raise ValueError("class_name_required")
-        classroom = state.create_class(name, timestamp=current_timestamp(), set_current=True)
+        classroom = state.create_class(
+            name, timestamp=current_timestamp(), set_current=True
+        )
         return build_response(
             state,
             result={"type": "class_create", "class_id": classroom.class_id},
@@ -342,7 +482,9 @@ def create_app(
             touch="modified",
         )
 
-    def handle_class_delete(state: ClassroomsState, data: dict[str, Any]) -> JSONResponse:
+    def handle_class_delete(
+        state: ClassroomsState, data: dict[str, Any]
+    ) -> JSONResponse:
         class_id = str(data.get("class_id") or "").strip()
         if not class_id:
             raise ValueError("class_missing")
@@ -354,7 +496,9 @@ def create_app(
             touch=None,
         )
 
-    def handle_class_reorder(state: ClassroomsState, data: dict[str, Any]) -> JSONResponse:
+    def handle_class_reorder(
+        state: ClassroomsState, data: dict[str, Any]
+    ) -> JSONResponse:
         raw_order = data.get("order")
         if not isinstance(raw_order, list):
             raise ValueError("class_order_invalid")
@@ -383,6 +527,8 @@ def create_app(
         "student_release_cooldown": handle_student_release_cooldown,
         "student_history_clear": handle_student_history_clear,
         "student_history_remove": handle_student_history_remove,
+        "history_entry_note": handle_history_note,
+        "history_entry_delete": handle_history_delete,
         "class_switch": handle_class_switch,
         "class_create": handle_class_create,
         "class_delete": handle_class_delete,
