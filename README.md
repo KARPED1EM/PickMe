@@ -1,7 +1,7 @@
 # 🧑‍🏫 PickMe
 
 A lightweight desktop app for **randomly picking students** and managing cooldowns.  
-Built with [Flask](https://flask.palletsprojects.com/) + `pywebview`.
+Built with [FastAPI](https://fastapi.tiangolo.com/) + `pywebview`.
 
 ---
 

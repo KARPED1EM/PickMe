@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import random
@@ -6,7 +6,10 @@ import time
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, jsonify, render_template, request
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from .data_manager import DataManager
 from .students_cms import StudentsCms
@@ -22,9 +25,15 @@ ERROR_TEXT = {
 }
 
 
-def create_app(user_data_dir: Path, default_data_dir: Path | None = None) -> Flask:
-    app = Flask(__name__, static_folder="static", template_folder="templates")
-    app.config["JSON_AS_ASCII"] = False
+def create_app(user_data_dir: Path, default_data_dir: Path | None = None) -> FastAPI:
+    base_dir = Path(__file__).resolve().parent
+    templates = Jinja2Templates(directory=str(base_dir / "templates"))
+
+    app = FastAPI()
+
+    static_dir = base_dir / "static"
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
     DataManager.configure(user_data_dir, default_data_dir)
     cms = StudentsCms.deserialize(DataManager.get_students_data())
@@ -32,8 +41,11 @@ def create_app(user_data_dir: Path, default_data_dir: Path | None = None) -> Fla
     def current_timestamp() -> float:
         return time.time()
 
-    def request_json() -> dict[str, Any]:
-        data = request.get_json(silent=True)
+    async def request_json(request: Request) -> dict[str, Any]:
+        try:
+            data = await request.json()
+        except (json.JSONDecodeError, ValueError):
+            data = {}
         return data if isinstance(data, dict) else {}
 
     def translate_error(code: str) -> str:
@@ -43,19 +55,19 @@ def create_app(user_data_dir: Path, default_data_dir: Path | None = None) -> Fla
         result: dict[str, Any] | None = None,
         status: int = 200,
         save: bool = False,
-    ):
+    ) -> JSONResponse:
         if save:
             DataManager.save_students_data(cms.serialize())
         payload = cms.snapshot(current_timestamp())
         body: dict[str, Any] = {"payload": payload}
         if result is not None:
             body["result"] = result
-        return jsonify(body), status
+        return JSONResponse(status_code=status, content=body)
 
-    def error_response(message: str, status: int = 400):
-        return jsonify({"message": message}), status
+    def error_response(message: str, status: int = 400) -> JSONResponse:
+        return JSONResponse(status_code=status, content={"message": message})
 
-    def run_single_random(ignore_cooldown: bool):
+    def run_single_random(ignore_cooldown: bool) -> JSONResponse:
         students = cms.eligible_students(ignore_cooldown=ignore_cooldown)
         if not students:
             raise ValueError("没有可用的学生")
@@ -68,7 +80,7 @@ def create_app(user_data_dir: Path, default_data_dir: Path | None = None) -> Fla
         }
         return success_response(result, save=True)
 
-    def run_group_random(ignore_cooldown: bool):
+    def run_group_random(ignore_cooldown: bool) -> JSONResponse:
         groups = cms.eligible_groups(ignore_cooldown=ignore_cooldown)
         if not groups:
             raise ValueError("没有可用的小组")
@@ -91,18 +103,19 @@ def create_app(user_data_dir: Path, default_data_dir: Path | None = None) -> Fla
         }
         return success_response(result, save=True)
 
-    @app.get("/")
-    def index():
+    @app.get("/", response_class=HTMLResponse)
+    async def index(request: Request) -> HTMLResponse:
         initial_payload = cms.snapshot(current_timestamp())
-        return render_template(
-            "index.html",
-            initial_data=json.dumps(initial_payload, ensure_ascii=False),
-            user_data_path=str(DataManager.user_data_dir()),
-        )
+        context = {
+            "request": request,
+            "initial_data": json.dumps(initial_payload, ensure_ascii=False),
+            "user_data_path": str(DataManager.user_data_dir()),
+        }
+        return templates.TemplateResponse("index.html", context)
 
     @app.post("/actions")
-    def handle_action():
-        data = request_json()
+    async def handle_action(request: Request) -> JSONResponse:
+        data = await request_json(request)
         action = str(data.get("action") or "").strip()
         if not action:
             return error_response("缺少action参数", 400)
@@ -133,7 +146,7 @@ def create_app(user_data_dir: Path, default_data_dir: Path | None = None) -> Fla
             return error_response(translate_error(str(error)), 404)
         return error_response("不支持的操作", 400)
 
-    def handle_set_cooldown(data: dict[str, Any]):
+    def handle_set_cooldown(data: dict[str, Any]) -> JSONResponse:
         try:
             days = int(data.get("days"))
         except (TypeError, ValueError):
@@ -143,11 +156,11 @@ def create_app(user_data_dir: Path, default_data_dir: Path | None = None) -> Fla
         cms.set_pick_cooldown(days)
         return success_response({"cooldown_days": cms.pick_cooldown}, save=True)
 
-    def handle_clear_cooldown():
+    def handle_clear_cooldown() -> JSONResponse:
         cms.clear_all_cooldowns()
         return success_response({"cleared": True}, save=True)
 
-    def handle_random_pick(data: dict[str, Any]):
+    def handle_random_pick(data: dict[str, Any]) -> JSONResponse:
         mode = str(data.get("mode") or "any").lower()
         ignore_cooldown = bool(data.get("ignore_cooldown"))
         if mode not in {"any", "group"}:
@@ -156,7 +169,7 @@ def create_app(user_data_dir: Path, default_data_dir: Path | None = None) -> Fla
             return run_group_random(ignore_cooldown)
         return run_single_random(ignore_cooldown)
 
-    def handle_student_force_cooldown(data: dict[str, Any]):
+    def handle_student_force_cooldown(data: dict[str, Any]) -> JSONResponse:
         student_id = str(data.get("student_id") or "").strip()
         if not student_id:
             raise ValueError("student_missing")
@@ -168,7 +181,7 @@ def create_app(user_data_dir: Path, default_data_dir: Path | None = None) -> Fla
             {"type": "force_cooldown", "student_id": student_id}, save=True
         )
 
-    def handle_student_release_cooldown(data: dict[str, Any]):
+    def handle_student_release_cooldown(data: dict[str, Any]) -> JSONResponse:
         student_id = str(data.get("student_id") or "").strip()
         if not student_id:
             raise ValueError("student_missing")
@@ -180,7 +193,7 @@ def create_app(user_data_dir: Path, default_data_dir: Path | None = None) -> Fla
             {"type": "release_cooldown", "student_id": student_id}, save=True
         )
 
-    def handle_student_update(data: dict[str, Any]):
+    def handle_student_update(data: dict[str, Any]) -> JSONResponse:
         student_id = str(data.get("student_id") or "").strip()
         if not student_id:
             raise ValueError("student_missing")
@@ -196,7 +209,7 @@ def create_app(user_data_dir: Path, default_data_dir: Path | None = None) -> Fla
             save=True,
         )
 
-    def handle_student_delete(data: dict[str, Any]):
+    def handle_student_delete(data: dict[str, Any]) -> JSONResponse:
         student_id = str(data.get("student_id") or "").strip()
         if not student_id:
             raise ValueError("student_missing")
@@ -206,7 +219,7 @@ def create_app(user_data_dir: Path, default_data_dir: Path | None = None) -> Fla
             {"type": "delete_student", "student_id": student_id}, save=True
         )
 
-    def handle_student_history_clear(data: dict[str, Any]):
+    def handle_student_history_clear(data: dict[str, Any]) -> JSONResponse:
         student_id = str(data.get("student_id") or "").strip()
         if not student_id:
             raise ValueError("student_missing")
@@ -218,7 +231,7 @@ def create_app(user_data_dir: Path, default_data_dir: Path | None = None) -> Fla
             {"type": "clear_history", "student_id": student_id}, save=True
         )
 
-    def handle_student_history_remove(data: dict[str, Any]):
+    def handle_student_history_remove(data: dict[str, Any]) -> JSONResponse:
         student_id = str(data.get("student_id") or "").strip()
         if not student_id:
             raise ValueError("student_missing")
@@ -241,7 +254,7 @@ def create_app(user_data_dir: Path, default_data_dir: Path | None = None) -> Fla
             save=True,
         )
 
-    def handle_student_create(data: dict[str, Any]):
+    def handle_student_create(data: dict[str, Any]) -> JSONResponse:
         name = data.get("name")
         group = data.get("group")
         student_id = data.get("student_id")

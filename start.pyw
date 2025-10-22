@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import ctypes
 import logging
@@ -9,7 +9,7 @@ import threading
 from pathlib import Path
 
 from platformdirs import user_data_dir
-from werkzeug.serving import make_server
+import uvicorn
 
 import webview
 from app import create_app
@@ -24,29 +24,32 @@ def find_free_port(host: str = "127.0.0.1") -> int:
         return sock.getsockname()[1]
 
 
-class FlaskServer(threading.Thread):
+class AppServer(threading.Thread):
     def __init__(self, app, host: str, port: int) -> None:
         super().__init__(daemon=True)
-        self._app = app
         self._host = host
         self._port = port
-        self._server = make_server(host, port, app)
-        self._ctx = app.app_context()
+        self._config = uvicorn.Config(
+            app,
+            host=host,
+            port=port,
+            log_level="info",
+            access_log=False,
+        )
+        self._server = uvicorn.Server(self._config)
+        self._server.install_signal_handlers = False
         self._shutdown_event = threading.Event()
 
     def run(self) -> None:
-        self._ctx.push()
-        log.info("Flask server started on http://%s:%s", self._host, self._port)
         try:
-            self._server.serve_forever()
+            log.info("FastAPI server started on http://%s:%s", self._host, self._port)
+            self._server.run()
         finally:
-            self._server.server_close()
-            self._ctx.pop()
             self._shutdown_event.set()
 
     def shutdown(self) -> None:
-        log.info("Stopping Flask server")
-        self._server.shutdown()
+        log.info("Stopping FastAPI server")
+        self._server.should_exit = True
         self._shutdown_event.wait(timeout=5)
 
 
@@ -134,7 +137,7 @@ def main() -> None:
     host = "127.0.0.1"
     port = find_free_port(host)
 
-    server = FlaskServer(app, host, port)
+    server = AppServer(app, host, port)
     server.start()
 
     window = webview.create_window(
