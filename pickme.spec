@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['scripts/desktop_app.pyw'],
+    ['scripts\\desktop.pyw'],
     pathex=[],
     binaries=[],
     datas=[('app/templates', 'app/templates'), ('app/static', 'app/static'), ('app/data', 'app/data')],

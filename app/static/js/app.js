@@ -16,6 +16,8 @@ const dom = {
   pickAny: $("pick-any"),
   pickGroup: $("pick-group"),
   ignoreCooldown: $("ignore-cooldown"),
+  classSwitcher: $("class-switcher"),
+  classSwitcherLabel: $("class-switcher-label"),
   contextMenu: $("context-menu"),
   modalRoot: $("modal-root"),
   toast: $("toast"),
@@ -25,8 +27,15 @@ const dom = {
 const STORAGE_MODE = window.__APP_STORAGE_MODE__ || "filesystem";
 const USE_BROWSER_STORAGE = STORAGE_MODE === "browser";
 const STORAGE_KEY = "pickme::payload";
+const DEFAULT_CLASS_NAME = "未命名班级";
 
 const state = {
+  app: null,
+  classes: [],
+  classMap: new Map(),
+  classData: new Map(),
+  currentClassId: "",
+  currentClassName: "",
   payload: null,
   students: [],
   studentsMap: new Map(),
@@ -37,6 +46,7 @@ const state = {
   lastSelection: null,
   menuTarget: null,
   historyStudentId: null,
+  classDragSource: null,
 };
 
 let toastTimer = null;
@@ -55,19 +65,25 @@ const timeFormatter = new Intl.DateTimeFormat("zh-CN", {
   hour12: false,
 });
 
+const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
 init();
 
 function init() {
   state.ignoreCooldown = dom.ignoreCooldown.checked;
-  const initialPayload = loadInitialPayload();
-  applyPayload(initialPayload);
+  const initialState = loadInitialState();
+  applyAppState(initialState);
   bindEvents();
   render();
 }
 
-function loadInitialPayload() {
+function loadInitialState() {
   if (USE_BROWSER_STORAGE) {
-    const stored = readStoredPayload();
+    const stored = readStoredState();
     if (stored) {
       return stored;
     }
@@ -75,7 +91,7 @@ function loadInitialPayload() {
   return window.__APP_INITIAL_DATA__ || {};
 }
 
-function readStoredPayload() {
+function readStoredState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
@@ -94,15 +110,37 @@ function readStoredPayload() {
   }
 }
 
-function persistPayload(payload) {
+function persistState(appState) {
   if (!USE_BROWSER_STORAGE) {
     return;
   }
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
   } catch (error) {
     console.warn("\u5199\u5165\u6d4f\u89c8\u5668\u5b58\u6863\u5931\u8d25", error);
   }
+}
+
+function buildPersistableState(normalized) {
+  const classesData = {};
+  state.classData.forEach((payload, classId) => {
+    classesData[classId] = payload;
+  });
+  const classes = state.classes.map(item => ({
+    ...item,
+    data: classesData[item.id] || null,
+  }));
+  return {
+    version: normalized.version,
+    current_class_id: state.currentClassId,
+    current_class: {
+      id: state.currentClassId,
+      name: state.currentClassName,
+      payload: state.payload,
+    },
+    classes,
+    classes_data: classesData,
+  };
 }
 
 function bindEvents() {
@@ -119,6 +157,9 @@ function bindEvents() {
   dom.cooldownDisplay.addEventListener("click", openCooldownModal);
   dom.clearCooldown.addEventListener("click", handleClearCooldown);
   dom.addStudent.addEventListener("click", () => openStudentModal("create"));
+  if (dom.classSwitcher) {
+    dom.classSwitcher.addEventListener("click", openClassModal);
+  }
   dom.studentList.addEventListener("contextmenu", handleContextTrigger);
   dom.cooldownList.addEventListener("contextmenu", handleContextTrigger);
   document.addEventListener("click", handleGlobalClick);
@@ -129,14 +170,53 @@ function bindEvents() {
   window.addEventListener("keydown", handleKeydown);
 }
 
-function applyPayload(payload) {
-  state.payload = normalizePayload(payload);
+function applyAppState(rawState) {
+  const normalized = normalizeAppState(rawState);
+  if (!(state.classData instanceof Map)) {
+    state.classData = new Map();
+  }
+  state.classes = normalized.classes;
+  state.classMap = new Map(
+    state.classes.map(item => [item.id, item])
+  );
+  state.currentClassId =
+    normalized.current_class_id ||
+    (state.classes.length ? state.classes[0].id : "");
+  const currentMeta =
+    state.classMap.get(state.currentClassId) ||
+    state.classes.find(item => item.id === state.currentClassId) ||
+    null;
+  state.currentClassName = currentMeta ? currentMeta.name : DEFAULT_CLASS_NAME;
+  const classesData = normalized.classes_data || {};
+  Object.entries(classesData).forEach(([classId, payload]) => {
+    if (payload && typeof payload === "object") {
+      state.classData.set(classId, normalizePayload(payload));
+    }
+  });
+  const rawCurrent =
+    normalized.current_class && typeof normalized.current_class === "object"
+      ? normalized.current_class
+      : {};
+  let payloadSource = rawCurrent.payload;
+  if (!payloadSource && state.classData.has(state.currentClassId)) {
+    payloadSource = state.classData.get(state.currentClassId);
+  }
+  state.payload = normalizePayload(payloadSource || {});
+  state.classData.set(state.currentClassId, state.payload);
+  if (currentMeta) {
+    currentMeta.student_count = state.payload.students.length;
+    currentMeta.cooldown_days = state.payload.cooldown_days;
+  }
   state.studentsMap = new Map(
     state.payload.students.map(student => [student.id, student])
   );
   state.students = getSortedStudents(state.payload.students);
   syncSelection();
-  persistPayload(state.payload);
+  const persistable = buildPersistableState(normalized);
+  state.app = persistable;
+  persistState(persistable);
+  renderClassSwitcher();
+  updateClassModal();
 }
 
 function render() {
@@ -144,9 +224,22 @@ function render() {
   renderLists();
   renderSelection();
   dom.ignoreCooldown.checked = state.ignoreCooldown;
+  renderClassSwitcher();
   updateControls();
   if (state.historyStudentId) {
     updateHistoryModal(state.historyStudentId);
+  }
+}
+
+function renderClassSwitcher() {
+  if (!dom.classSwitcherLabel) {
+    return;
+  }
+  const name = state.currentClassName || "未命名班级";
+  dom.classSwitcherLabel.textContent = name;
+  if (dom.classSwitcher) {
+    dom.classSwitcher.dataset.classId = state.currentClassId || "";
+    dom.classSwitcher.title = `${name} · ${state.payload.students.length} 人`;
   }
 }
 
@@ -291,6 +384,9 @@ function updateControls() {
   dom.addStudent.disabled = disabled;
   dom.cooldownDisplay.disabled = disabled;
   dom.ignoreCooldown.disabled = disabled;
+  if (dom.classSwitcher) {
+    dom.classSwitcher.disabled = disabled;
+  }
   dom.resultCard.classList.toggle("is-animating", state.isAnimating);
   const historyButtons = dom.modalRoot.querySelectorAll("[data-history-action]");
   historyButtons.forEach(button => {
@@ -337,6 +433,375 @@ function openCooldownModal() {
   }
 }
 
+function openClassModal() {
+  if (state.busy || state.isAnimating) {
+    return;
+  }
+  closeContextMenu();
+  const content = buildClassModal();
+  showModal(content);
+  bindClassModalEvents();
+}
+
+function buildClassModal() {
+  return `
+<div class="modal-backdrop class-modal-backdrop" data-class-modal="panel">
+  <div class="modal-panel class-modal-panel">
+    <div class="modal-header">
+      <h2 class="modal-title">班级管理</h2>
+      <button type="button" class="btn btn-ghost btn-sm" data-modal-close>关闭</button>
+    </div>
+    <div class="class-modal-body">
+      <div class="class-toolbar">
+        <button type="button" class="btn btn-accent btn-sm" id="class-add-btn">添加班级</button>
+        <span class="class-toolbar-note">拖拽列表可调整班级顺序</span>
+      </div>
+      <ul id="class-list" class="class-list">
+        ${buildClassListItems()}
+      </ul>
+    </div>
+  </div>
+</div>
+<div class="modal-layer d-none" id="class-add-layer">
+  <div class="modal-panel class-add-panel">
+    <div class="modal-header">
+      <h3 class="modal-title">添加班级</h3>
+    </div>
+    <form id="class-add-form" class="class-add-form">
+      <label for="class-add-name" class="form-label">班级名称</label>
+      <input id="class-add-name" name="name" type="text" class="form-control" maxlength="40" autocomplete="off" required>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-class-cancel>取消</button>
+        <button type="submit" class="btn btn-accent">确认添加</button>
+      </div>
+    </form>
+  </div>
+</div>`;
+}
+
+function buildClassListItems() {
+  if (!state.classes.length) {
+    return '<li class="empty-message">暂无班级</li>';
+  }
+  return state.classes.map(buildClassItem).join("");
+}
+
+function buildClassItem(meta) {
+  const id = String(meta.id || "");
+  const isActive = id === state.currentClassId;
+  const deleteDisabled = state.classes.length <= 1 ? " disabled" : "";
+  const switchDisabled = isActive ? " disabled" : "";
+  const lastUsedText =
+    meta.last_used_at > 0 ? `最近 ${formatSince(meta.last_used_at)}` : "尚未使用";
+  const createdText = meta.created_at > 0 ? formatDate(meta.created_at) : "--";
+  return `
+  <li class="class-item${isActive ? " is-active" : ""}" draggable="true" data-class-id="${escapeHtml(id)}">
+    <div class="class-item-handle" aria-hidden="true" data-class-handle>
+      <span class="visually-hidden">拖拽排序</span>
+    </div>
+    <div class="class-item-main" data-class-switch>
+      <div class="class-item-name">${escapeHtml(meta.name)}</div>
+      <div class="class-item-meta">
+        <span>${meta.student_count} 人</span>
+        <span>冷却 ${meta.cooldown_days} 天</span>
+        <span>${escapeHtml(lastUsedText)}</span>
+        <span>创建于 ${escapeHtml(createdText)}</span>
+      </div>
+    </div>
+    <div class="class-item-actions">
+      <button type="button" class="btn btn-ghost btn-xs" data-class-switch${switchDisabled}>${isActive ? "当前班级" : "切换"}</button>
+      <button type="button" class="btn btn-ghost btn-xs" data-class-delete${deleteDisabled}>删除</button>
+    </div>
+  </li>`;
+}
+
+function bindClassModalEvents() {
+  const closers = dom.modalRoot.querySelectorAll("[data-modal-close]");
+  closers.forEach(button => button.addEventListener("click", closeModal));
+  const addButton = dom.modalRoot.querySelector("#class-add-btn");
+  if (addButton) {
+    addButton.addEventListener("click", openClassAddLayer);
+  }
+  const list = dom.modalRoot.querySelector("#class-list");
+  if (list) {
+    list.addEventListener("click", handleClassListClick);
+    list.addEventListener("dragover", handleClassDragOver);
+    list.addEventListener("drop", handleClassDrop);
+    attachClassListHandlers(list);
+  }
+  const layer = dom.modalRoot.querySelector("#class-add-layer");
+  if (layer) {
+    layer.addEventListener("click", event => {
+      if (event.target === layer) {
+        closeClassAddLayer();
+      }
+    });
+    const cancelButton = layer.querySelector("[data-class-cancel]");
+    if (cancelButton) {
+      cancelButton.addEventListener("click", closeClassAddLayer);
+    }
+    const form = layer.querySelector("#class-add-form");
+    if (form) {
+      form.addEventListener("submit", handleClassAddSubmit);
+    }
+  }
+}
+
+function updateClassModal() {
+  const list = dom.modalRoot.querySelector("#class-list");
+  if (!list) {
+    return;
+  }
+  list.innerHTML = buildClassListItems();
+  attachClassListHandlers(list);
+}
+
+function attachClassListHandlers(list) {
+  const items = list.querySelectorAll(".class-item");
+  items.forEach(item => {
+    item.addEventListener("dragstart", handleClassDragStart);
+    item.addEventListener("dragend", handleClassDragEnd);
+  });
+}
+
+function handleClassListClick(event) {
+  if (state.busy) {
+    return;
+  }
+  const deleteButton = event.target.closest("[data-class-delete]");
+  if (deleteButton) {
+    const item = deleteButton.closest(".class-item");
+    if (!item || deleteButton.disabled) {
+      return;
+    }
+    const classId = item.dataset.classId;
+    if (classId) {
+      handleClassDeleteRequest(classId);
+    }
+    return;
+  }
+  const switchTarget = event.target.closest("[data-class-switch]");
+  if (switchTarget) {
+    const item = switchTarget.closest(".class-item");
+    if (!item || switchTarget.disabled) {
+      return;
+    }
+    const classId = item.dataset.classId;
+    if (!classId || classId === state.currentClassId) {
+      return;
+    }
+    handleClassSwitchRequest(classId);
+  }
+}
+
+async function handleClassSwitchRequest(classId) {
+  if (state.busy) {
+    return;
+  }
+  setBusy(true);
+  try {
+    const response = await sendAction("class_switch", { class_id: classId });
+    applyAppState(response.state);
+    render();
+    closeModal();
+    showToast(`已切换至 ${state.currentClassName}`);
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    if (!state.isAnimating) {
+      setBusy(false);
+    }
+  }
+}
+
+async function handleClassDeleteRequest(classId) {
+  if (state.busy) {
+    return;
+  }
+  const meta = state.classMap.get(classId);
+  if (!meta) {
+    showToast("未找到指定班级");
+    return;
+  }
+  const confirmed = await openConfirmModal({
+    title: "删除班级",
+    message: `确认删除「${meta.name}」吗？该班级的所有数据都将被移除。`,
+    confirmLabel: "删除",
+    confirmTone: "danger",
+  });
+  if (!confirmed) {
+    return;
+  }
+  setBusy(true);
+  try {
+    const response = await sendAction("class_delete", { class_id: classId });
+    applyAppState(response.state);
+    render();
+    showToast("班级已删除");
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    if (!state.isAnimating) {
+      setBusy(false);
+    }
+  }
+}
+
+function openClassAddLayer() {
+  const layer = dom.modalRoot.querySelector("#class-add-layer");
+  if (!layer) {
+    return;
+  }
+  layer.classList.remove("d-none");
+  const input = layer.querySelector("#class-add-name");
+  if (input) {
+    input.value = "";
+    input.focus();
+    input.select();
+  }
+}
+
+function closeClassAddLayer() {
+  const layer = dom.modalRoot.querySelector("#class-add-layer");
+  if (!layer) {
+    return;
+  }
+  layer.classList.add("d-none");
+  const form = layer.querySelector("#class-add-form");
+  if (form) {
+    form.reset();
+  }
+}
+
+async function handleClassAddSubmit(event) {
+  event.preventDefault();
+  if (state.busy) {
+    return;
+  }
+  const form = event.currentTarget;
+  const input = form.querySelector("#class-add-name");
+  const name = input ? input.value.trim() : "";
+  if (!name) {
+    if (input) {
+      input.focus();
+      input.select();
+    }
+    showToast("班级名称不能为空");
+    return;
+  }
+  setBusy(true);
+  try {
+    const response = await sendAction("class_create", { name });
+    applyAppState(response.state);
+    render();
+    closeModal();
+    showToast(`已创建班级「${state.currentClassName}」`);
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    if (!state.isAnimating) {
+      setBusy(false);
+    }
+  }
+}
+
+function handleClassDragStart(event) {
+  const item = event.currentTarget;
+  const classId = item ? item.dataset.classId : "";
+  if (!classId) {
+    return;
+  }
+  state.classDragSource = classId;
+  item.classList.add("is-dragging");
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    try {
+      event.dataTransfer.setData("text/plain", classId);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function handleClassDragEnd(event) {
+  const item = event.currentTarget;
+  if (item) {
+    item.classList.remove("is-dragging");
+  }
+  state.classDragSource = null;
+}
+
+function handleClassDragOver(event) {
+  event.preventDefault();
+  const list = event.currentTarget;
+  const draggingId = state.classDragSource;
+  if (!draggingId) {
+    return;
+  }
+  const draggingItem = list.querySelector(".class-item.is-dragging");
+  if (!draggingItem) {
+    return;
+  }
+  const targetItem = event.target.closest(".class-item");
+  if (!targetItem || targetItem === draggingItem) {
+    return;
+  }
+  const rect = targetItem.getBoundingClientRect();
+  const offset = event.clientY - rect.top;
+  const shouldInsertBefore = offset < rect.height / 2;
+  if (shouldInsertBefore) {
+    list.insertBefore(draggingItem, targetItem);
+  } else {
+    list.insertBefore(draggingItem, targetItem.nextElementSibling);
+  }
+}
+
+async function handleClassDrop(event) {
+  event.preventDefault();
+  const list = event.currentTarget;
+  const order = getClassOrderFromDom(list);
+  const currentOrder = state.classes.map(item => item.id);
+  state.classDragSource = null;
+  if (!order.length || classOrderEquals(order, currentOrder)) {
+    updateClassModal();
+    return;
+  }
+  await submitClassReorder(order);
+}
+
+async function submitClassReorder(order) {
+  if (state.busy) {
+    return;
+  }
+  setBusy(true);
+  try {
+    const response = await sendAction("class_reorder", { order });
+    applyAppState(response.state);
+    render();
+    showToast("班级排序已更新");
+  } catch (error) {
+    showToast(error.message);
+    updateClassModal();
+  } finally {
+    if (!state.isAnimating) {
+      setBusy(false);
+    }
+  }
+}
+
+function getClassOrderFromDom(list) {
+  return Array.from(list.querySelectorAll(".class-item"))
+    .map(item => item.dataset.classId)
+    .filter(Boolean);
+}
+
+function classOrderEquals(a, b) {
+  if (a.length !== b.length) {
+    return false;
+  }
+  return a.every((value, index) => value === b[index]);
+}
+
 async function handleCooldownSave(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric < 1) {
@@ -359,7 +824,7 @@ async function handleCooldownSave(value) {
   setBusy(true);
   try {
     const response = await sendAction("set_cooldown", { days: target });
-    applyPayload(response.payload);
+    applyAppState(response.state);
     render();
     showToast("\u51b7\u5374\u65f6\u95f4\u5df2\u66f4\u65b0");
     closeModal();
@@ -389,7 +854,7 @@ async function handleClearCooldown() {
   setBusy(true);
   try {
     const response = await sendAction("clear_cooldown");
-    applyPayload(response.payload);
+    applyAppState(response.state);
     render();
     showToast("\u51b7\u5374\u5217\u8868\u5df2\u6e05\u7a7a");
   } catch (error) {
@@ -457,6 +922,12 @@ function handleContextSelection(event) {
 
 function handleKeydown(event) {
   if (event.key === "Escape") {
+    const addLayer = dom.modalRoot.querySelector("#class-add-layer:not(.d-none)");
+    if (addLayer) {
+      event.preventDefault();
+      closeClassAddLayer();
+      return;
+    }
     if (!dom.modalRoot.classList.contains("d-none")) {
       closeModal();
       return;
@@ -474,7 +945,7 @@ async function runSimpleAction(action, payload, message) {
   setBusy(true);
   try {
     const response = await sendAction(action, payload);
-    applyPayload(response.payload);
+    applyAppState(response.state);
     render();
     if (message) {
       showToast(message);
@@ -787,7 +1258,7 @@ async function handleHistoryClear(studentId) {
   setBusy(true);
   try {
     const response = await sendAction("student_history_clear", { student_id: studentId });
-    applyPayload(response.payload);
+    applyAppState(response.state);
     render();
     showToast("\u5df2\u6e05\u7a7a\u5386\u53f2");
   } catch (error) {
@@ -807,7 +1278,7 @@ async function handleHistoryRemove(studentId, timestamp) {
       student_id: studentId,
       timestamp,
     });
-    applyPayload(response.payload);
+    applyAppState(response.state);
     render();
     showToast("\u5df2\u5220\u9664\u8bb0\u5f55");
   } catch (error) {
@@ -1129,7 +1600,7 @@ async function submitStudentCreate(payload) {
   setBusy(true);
   try {
     const response = await sendAction("student_create", payload);
-    applyPayload(response.payload);
+    applyAppState(response.state);
     render();
     showToast("\u5df2\u65b0\u589e\u5b66\u751f");
     closeModal();
@@ -1146,7 +1617,7 @@ async function submitStudentUpdate(payload) {
   setBusy(true);
   try {
     const response = await sendAction("student_update", payload);
-    applyPayload(response.payload);
+    applyAppState(response.state);
     render();
     showToast("\u5df2\u4fdd\u5b58\u4fee\u6539");
     closeModal();
@@ -1168,7 +1639,7 @@ async function handleStudentDelete(student) {
     const response = await sendAction("student_delete", {
       student_id: student.id,
     });
-    applyPayload(response.payload);
+    applyAppState(response.state);
     render();
     showToast("\u5df2\u5220\u9664\u5b66\u751f");
     closeModal();
@@ -1193,7 +1664,7 @@ async function handleRandom(mode) {
       ignore_cooldown: state.ignoreCooldown,
     });
     await runSelectionAnimation(response.result);
-    applyPayload(response.payload);
+    applyAppState(response.state);
     render();
   } catch (error) {
     showToast(error.message);
@@ -1490,7 +1961,7 @@ function getSortedStudents(students) {
 async function sendAction(action, data) {
   const payload = { action, ...data };
   if (USE_BROWSER_STORAGE) {
-    payload.payload = state.payload;
+    payload.payload = state.app;
   }
   let response;
   try {
@@ -1516,14 +1987,119 @@ async function sendAction(action, data) {
   return result;
 }
 
+function normalizeAppState(raw) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  const classes = Array.isArray(source.classes) ? source.classes : [];
+  const normalizedClasses = classes
+    .map((item, index) => normalizeClassMeta(item, index))
+    .sort((a, b) => a.order - b.order);
+  let currentId =
+    typeof source.current_class_id === "string" ? source.current_class_id : "";
+  if (currentId && !normalizedClasses.some(item => item.id === currentId)) {
+    currentId = "";
+  }
+  const fallbackId =
+    currentId || (normalizedClasses.length ? normalizedClasses[0].id : "");
+  const currentClass =
+    source.current_class && typeof source.current_class === "object"
+      ? { ...source.current_class }
+      : {};
+  currentClass.id = typeof currentClass.id === "string" ? currentClass.id : fallbackId;
+  currentClass.name =
+    typeof currentClass.name === "string" && currentClass.name.trim()
+      ? currentClass.name.trim()
+      : "";
+  if (!currentClass.name) {
+    const metaMatch = normalizedClasses.find(item => item.id === currentClass.id);
+    currentClass.name = metaMatch ? metaMatch.name : "未命名班级";
+  }
+  let payloadCandidate = currentClass.payload;
+  if (!payloadCandidate || typeof payloadCandidate !== "object") {
+    payloadCandidate = source.payload;
+  }
+  if (
+    !payloadCandidate ||
+    typeof payloadCandidate !== "object" ||
+    (!Array.isArray(payloadCandidate.students) &&
+      !Array.isArray(source.students) &&
+      source.cooldown_days === undefined)
+  ) {
+    payloadCandidate = {};
+  }
+  if (
+    (!Array.isArray(payloadCandidate.students) || payloadCandidate.students.length === 0) &&
+    Array.isArray(source.students)
+  ) {
+    payloadCandidate = {
+      cooldown_days: source.cooldown_days,
+      students: source.students,
+      generated_at: source.generated_at,
+    };
+  }
+  currentClass.payload = payloadCandidate;
+  if (!normalizedClasses.length) {
+    const synthesizedId = currentClass.id || "default";
+    normalizedClasses.push({
+      id: synthesizedId,
+      name: currentClass.name || "默认班级",
+      order: 0,
+      student_count: Array.isArray(payloadCandidate.students)
+        ? payloadCandidate.students.length
+        : 0,
+      cooldown_days: Number(payloadCandidate.cooldown_days) || Number(source.cooldown_days) || 3,
+      created_at: Number(source.created_at) || 0,
+      updated_at: Number(source.updated_at) || 0,
+      last_used_at: Number(source.last_used_at) || 0,
+    });
+    currentId = synthesizedId;
+    currentClass.id = synthesizedId;
+  }
+  return {
+    version: Number.isFinite(Number(source.version))
+      ? Number(source.version)
+      : 0,
+    current_class_id:
+      currentId || (normalizedClasses.length ? normalizedClasses[0].id : ""),
+    current_class: currentClass,
+    classes: normalizedClasses,
+  };
+}
+
+function normalizeClassMeta(entry, index) {
+  const item = entry && typeof entry === "object" ? entry : {};
+  const id =
+    typeof item.id === "string" && item.id.trim()
+      ? item.id.trim()
+      : `class-${index + 1}`;
+  const name =
+    typeof item.name === "string" && item.name.trim()
+      ? item.name.trim()
+      : "未命名班级";
+  const toNumber = (value, fallback = 0) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : fallback;
+  };
+  return {
+    id,
+    name,
+    order: toNumber(item.order, index),
+    student_count: Math.max(0, toNumber(item.student_count, 0)),
+    cooldown_days: Math.max(1, toNumber(item.cooldown_days, 3)),
+    created_at: toNumber(item.created_at, 0),
+    updated_at: toNumber(item.updated_at, 0),
+    last_used_at: toNumber(item.last_used_at, 0),
+  };
+}
+
 function normalizePayload(raw) {
-  const students = Array.isArray(raw.students)
-    ? raw.students.map(normalizeStudent)
+  const source = raw && typeof raw === "object" ? raw : {};
+  const students = Array.isArray(source.students)
+    ? source.students.map(normalizeStudent)
     : [];
   return {
-    cooldown_days: Math.max(1, Number(raw.cooldown_days) || 1),
+    cooldown_days: Math.max(1, Number(source.cooldown_days) || 1),
     students,
-    generated_at: Number(raw.generated_at) || Date.now() / 1000,
+    generated_at: Number(source.generated_at) || Date.now() / 1000,
   };
 }
 
@@ -1560,6 +2136,14 @@ function groupColor(value) {
   const lightness = 58 - (group % 4) * 6;
   const alpha = 0.4 + ((group % 5) * 6) / 100;
   return `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
+}
+
+function formatDate(timestamp) {
+  const numeric = Number(timestamp);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return "--";
+  }
+  return dateFormatter.format(new Date(numeric * 1000));
 }
 
 function formatTime(timestamp) {

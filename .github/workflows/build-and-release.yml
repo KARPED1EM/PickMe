@@ -41,7 +41,7 @@ jobs:
         shell: pwsh
         run: |
           if (Test-Path dist) { Remove-Item -Recurse -Force dist }
-          pyinstaller scripts/desktop_app.pyw --clean --onefile --noconsole `
+          pyinstaller scripts/desktop.pyw --clean --onefile --noconsole `
             --name PickMe `
             --icon "icon.ico" `
             --add-data "app/templates;app/templates" `
@@ -55,36 +55,6 @@ jobs:
           path: dist/PickMe.exe
           if-no-files-found: error
 
-      - name: Build ithm (x64 only)
-        if: matrix.arch == 'x64'
-        shell: pwsh
-        run: |
-          if (Test-Path dist-ithm) { Remove-Item -Recurse -Force dist-ithm }
-          if (Test-Path build) { Remove-Item -Recurse -Force build }
-
-          if (Test-Path "app\data.bak") { Remove-Item -Recurse -Force "app\data.bak" }
-          Rename-Item -Path "app\data" -NewName "data.bak"
-          New-Item -ItemType Directory -Path "app\data" | Out-Null
-          Copy-Item -Recurse -Force "data-ithm\*" "app\data\"
-
-          pyinstaller scripts/desktop_app.pyw --clean --onefile --noconsole `
-            --name PickMe `
-            --icon "icon.ico" `
-            --add-data "app/templates;app/templates" `
-            --add-data "app/static;app/static" `
-            --add-data "app/data;app/data" `
-            --distpath dist-ithm
-
-          Remove-Item -Recurse -Force "app\data"
-          Rename-Item -Path "app\data.bak" -NewName "data"
-
-      - name: Upload artifact exe (PickMe-ithm-win-py313-x64)
-        if: matrix.arch == 'x64'
-        uses: actions/upload-artifact@v4
-        with:
-          name: PickMe-ithm-win-py313-x64
-          path: dist-ithm/PickMe.exe
-          if-no-files-found: error
 
   build-arm64:
     name: Build Windows (ARM64)
@@ -111,7 +81,7 @@ jobs:
         shell: pwsh
         run: |
           if (Test-Path dist) { Remove-Item -Recurse -Force dist }
-          pyinstaller scripts/desktop_app.pyw --clean --onefile --noconsole `
+          pyinstaller scripts/desktop.pyw --clean --onefile --noconsole `
             --name PickMe `
             --icon "icon.ico" `
             --add-data "app/templates;app/templates" `

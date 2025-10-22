@@ -6,18 +6,21 @@ import os
 import socket
 import sys
 import threading
+from pathlib import Path
 
 import uvicorn
 import webview
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from app import create_app
 from pickme.paths import application_paths
 
 log = logging.getLogger("pickme.desktop")
 
-ALREADY_RUNNING_MESSAGE = (
-    "\u7a0b\u5e8f\u5df2\u7ecf\u5728\u8fd0\u884c\u3002\n\nApplication is already running."
-)
+ALREADY_RUNNING_MESSAGE = "\u7a0b\u5e8f\u5df2\u7ecf\u5728\u8fd0\u884c\u3002\n\nApplication is already running."
 ALREADY_RUNNING_TITLE = "\u63d0\u793a | Notice"
 WEBVIEW_MISSING_MESSAGE = (
     "\u672a\u68c0\u6d4b\u5230 Microsoft Edge WebView2 \u8fd0\u884c\u65f6\n"
@@ -104,7 +107,9 @@ def webview2_installed() -> bool:
 
 def prompt_open_webview2_page_and_exit() -> None:
     ret = message_box(
-        WEBVIEW_MISSING_MESSAGE, WEBVIEW_MISSING_TITLE, 0x00000040 | 0x00000004 | 0x00040000
+        WEBVIEW_MISSING_MESSAGE,
+        WEBVIEW_MISSING_TITLE,
+        0x00000040 | 0x00000004 | 0x00040000,
     )
     if ret == 6:
         url = "https://developer.microsoft.com/en-us/microsoft-edge/webview2/consumer"
@@ -119,7 +124,9 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
     if already_running():
-        message_box(ALREADY_RUNNING_MESSAGE, ALREADY_RUNNING_TITLE, 0x00000040 | 0x00040000)
+        message_box(
+            ALREADY_RUNNING_MESSAGE, ALREADY_RUNNING_TITLE, 0x00000040 | 0x00040000
+        )
         sys.exit(0)
 
     if not webview2_installed():

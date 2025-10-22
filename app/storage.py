@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import json
 import threading
 from pathlib import Path
 from typing import Any, Protocol
 
+from .classrooms import ClassroomsState
 from .data_manager import DataManager
-from .students_cms import StudentsCms
 
 
 class StorageBackend(Protocol):
@@ -15,11 +14,11 @@ class StorageBackend(Protocol):
     mode: str
     location_hint: str
 
-    def load(self, request_data: dict[str, Any] | None = None) -> StudentsCms:
-        """Return a StudentsCms instance representing the current data state."""
+    def load(self, request_data: dict[str, Any] | None = None) -> ClassroomsState:
+        """Return a ClassroomsState representing the current data state."""
 
-    def save(self, cms: StudentsCms) -> None:
-        """Persist the provided StudentsCms state (no-op for some backends)."""
+    def save(self, state: ClassroomsState) -> None:
+        """Persist the provided state (no-op for some backends)."""
 
 
 class FileStorageBackend:
@@ -31,14 +30,15 @@ class FileStorageBackend:
         DataManager.configure(user_dir, default_data_dir)
         self._lock = threading.RLock()
         self.location_hint = str(DataManager.user_data_dir())
+        self._default_payload = _load_default_payload(default_data_dir)
 
-    def load(self, request_data: dict[str, Any] | None = None) -> StudentsCms:
+    def load(self, request_data: dict[str, Any] | None = None) -> ClassroomsState:
         with self._lock:
             data = DataManager.get_students_data()
-        return StudentsCms.deserialize(data)
+        return ClassroomsState.from_payload(data, fallback=self._default_payload)
 
-    def save(self, cms: StudentsCms) -> None:
-        payload = cms.serialize()
+    def save(self, state: ClassroomsState) -> None:
+        payload = state.serialize()
         with self._lock:
             DataManager.save_students_data(payload)
 
@@ -47,31 +47,19 @@ class BrowserStorageBackend:
     """Persist data inside the user's browser (multi-user server mode)."""
 
     mode = "browser"
-    location_hint = "浏览器本地存储 (localStorage)"
+    location_hint = "浏览器存储 (localStorage)"
 
     def __init__(self, default_data_dir: Path | None = None) -> None:
-        default_payload = DataManager.DEFAULT_PAYLOAD
-        if default_data_dir:
-            candidate = default_data_dir / DataManager.DEFAULT_FILE
-            if candidate.exists():
-                try:
-                    default_payload = candidate.read_text(encoding="utf-8")
-                except UnicodeDecodeError:
-                    default_payload = candidate.read_text(
-                        encoding="utf-8", errors="ignore"
-                    )
-        self._default_payload = default_payload
+        self._default_payload = _load_default_payload(default_data_dir)
 
-    def load(self, request_data: dict[str, Any] | None = None) -> StudentsCms:
+    def load(self, request_data: dict[str, Any] | None = None) -> ClassroomsState:
         if request_data:
             payload = request_data.get("payload")
-            if isinstance(payload, str):
-                return StudentsCms.deserialize(payload)
-            if isinstance(payload, dict):
-                return StudentsCms.deserialize(json.dumps(payload, ensure_ascii=False))
-        return StudentsCms.deserialize(self._default_payload)
+            if isinstance(payload, (str, dict)):
+                return ClassroomsState.from_payload(payload, fallback=self._default_payload)
+        return ClassroomsState.from_payload(None, fallback=self._default_payload)
 
-    def save(self, cms: StudentsCms) -> None:
+    def save(self, state: ClassroomsState) -> None:
         # Persistence happens client side; nothing to do on the server.
         return
 
@@ -90,3 +78,14 @@ def create_storage_backend(
         return FileStorageBackend(user_dir, default_data_dir)
     raise ValueError(f"Unsupported storage mode: {mode!r}")
 
+
+def _load_default_payload(default_data_dir: Path | None) -> str:
+    payload = DataManager.DEFAULT_PAYLOAD
+    if default_data_dir:
+        candidate = default_data_dir / DataManager.DEFAULT_FILE
+        if candidate.exists():
+            try:
+                return candidate.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                return candidate.read_text(encoding="utf-8", errors="ignore")
+    return payload

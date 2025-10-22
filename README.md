@@ -1,12 +1,13 @@
-# PickMe 教学点名器
+# PickMe 点名助手
 
-基于 FastAPI + Web 前端的随机点名工具，可在本地桌面环境（WebView2）或服务器模式下运行。桌面版会把数据存到当前用户目录，服务器模式则把数据交给每位访问者的浏览器（`localStorage`），便于多名教师独立使用。
+PickMe 是一款基于 FastAPI 与现代 Web 前端的随机点名工具，可在桌面端（WebView2 封装）或服务器模式下使用，帮助老师轻松开展课堂互动。
 
-## 功能特性
-- 随机点名（单人或按小组），支持冷却时间防止重复抽取
-- 学生管理（新增、编辑、删除、导出历史）
-- 拖拽式 UI、右键快捷菜单以及动画效果
-- 桌面模式使用 WebView2 封装，可生成单文件 EXE
+## 功能特点
+- 🎯 支持单人 / 小组随机抽取，冷却时间可配置，避免频繁重复点名
+- 🗂️ 班级管理：可创建、切换、删除班级，数据完全隔离，并支持拖拽调整显示顺序
+- 💾 多终端持久化：桌面模式写入本地用户目录，服务器模式存入浏览器 `localStorage`
+- 🪄 交互友好：右键快捷菜单、冷却队列、抽取历史等信息一目了然
+- 🧳 一键打包：提供 PyInstaller 配置，生成单文件 EXE 方便分发
 
 ## 环境准备
 ```bash
@@ -20,43 +21,45 @@ pip install -r requirements.txt
 
 ### 1. 桌面（WebView2）模式
 ```bash
-python scripts/desktop_app.pyw
+python scripts/desktop.pyw
 ```
-Windows 会启动 WebView2 窗口，数据保存位置默认为 `%LOCALAPPDATA%\PickMe\PickMe`。如果未安装 WebView2，程序会引导到官方安装页面。
+首次启动会在本机 `%LOCALAPPDATA%\PickMe\PickMe` 目录下生成数据文件，并自动打开 WebView2 界面。若系统未安装 WebView2，请先访问微软官方网站安装运行环境。
 
-### 2. 服务器 / 浏览器模式
+### 2. 服务器 / 开发模式
 ```bash
 python -m scripts.serve --host 0.0.0.0 --port 8000
 ```
-默认使用 `browser` 存储策略，所有变更都写入访问者浏览器的 `localStorage`。适用于多名教师通过浏览器独立管理各自数据的场景。Windows 下也可以执行 `scripts\serve.bat`。
+默认使用 `browser` 存储模式，每位访问者的数据保存在其浏览器 `localStorage` 中，互不影响。也可指定参数：
 
-常用选项：
-
-| 开关 | 说明 |
+| 参数 | 说明 |
 | ---- | ---- |
-| `--storage browser` | （默认）每个浏览器持久化到 `localStorage` |
-| `--storage filesystem` | 将服务器实例视为单用户，数据写入 `--user-data-dir` |
-| `--reload` | 开启 FastAPI 自动重载，便于开发 |
+| `--storage browser` | （默认）按客户端浏览器持久化 |
+| `--storage filesystem` | 将数据写入服务器指定目录，支持 `--user-data-dir` 自定义位置 |
+| `--reload` | 开发调试时启用 FastAPI 热重载 |
 
-## 数据存储说明
-- 桌面模式：`PickMe` 会在当前用户目录创建 `students_data.json`。首次运行会复制 `app/data/students_data.json` 作为初始数据。
-- 浏览器模式：后端保持无状态；每次请求都会把当前快照一并返回，由前端写入 `localStorage`。推荐在不同浏览器或隐私窗口中分别使用，以区分不同教师账号。
+Windows 用户亦可执行 `scripts\serve.bat` 快速启动。
 
-## 构建单文件 EXE
+## 班级与数据存储
+- 首次运行会预置默认班级 **「杭州黑马 AI Python 就业 3期」**，包含示例名单，可直接体验功能。
+- 桌面模式：所有班级数据写入当前用户目录 `%LOCALAPPDATA%\PickMe\PickMe\students_data.json`。
+- 服务器模式：默认写入访问者浏览器的 `localStorage`；切换浏览器或设备会得到独立的数据副本。
+- 每个班级拥有独立的学生列表、抽取历史与冷却状态；切换班级时会自动持久化当前班级的数据。
+
+## 打包单文件 EXE
 ```bash
-pyinstaller scripts/desktop_app.pyw --clean --onefile --noconsole ^
+pyinstaller scripts/desktop.pyw --clean --onefile --noconsole ^
   --name PickMe ^
   --icon icon.ico ^
   --add-data "app/templates;app/templates" ^
   --add-data "app/static;app/static" ^
   --add-data "app/data;app/data"
 ```
-生成的可执行文件位于 `dist/PickMe.exe`。CI 工作流（`.github/workflows/build-and-release.yml`）会自动产出 x86/x64/ARM64 构建。
+生成的可执行文件位于 `dist/PickMe.exe`。GitHub Actions 工作流 `.github/workflows/build-and-release.yml` 已配置 x86 / x64 / ARM64 多架构打包流程。
 
 ## 项目结构
 ```
-scripts/desktop_app.pyw   # WebView2 封装入口（桌面模式）
-scripts/serve.py          # FastAPI 服务入口
-app/                      # FastAPI 应用、前端静态资源、模板
-pickme/paths.py           # 运行时路径和用户目录解析
+scripts/desktop.pyw   # WebView2 封装入口（桌面模式）
+scripts/serve.py          # FastAPI 服务启动脚本
+app/                      # FastAPI 应用、模板与静态资源
+pickme/paths.py           # 运行时路径与用户数据目录定位
 ```

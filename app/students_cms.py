@@ -186,21 +186,30 @@ class StudentsCms:
             "generated_at": current_time,
         }
 
-    def serialize(self) -> str:
-        payload = {
+    def export(self) -> dict:
+        return {
             "cooldown_days": self.__pick_cooldown,
             "students": [student.serialize() for student in self.__students.values()],
         }
-        return json.dumps(payload, ensure_ascii=False, indent=2)
+
+    def serialize(self) -> str:
+        return json.dumps(self.export(), ensure_ascii=False, indent=2)
 
     @staticmethod
-    def deserialize(data: str) -> "StudentsCms":
+    def deserialize(data: str | dict | list | None) -> "StudentsCms":
         manager = StudentsCms()
-        if not data:
+        if data is None:
             return manager
-        try:
-            raw = json.loads(data)
-        except json.JSONDecodeError:
+        if isinstance(data, str):
+            if not data.strip():
+                return manager
+            try:
+                raw = json.loads(data)
+            except json.JSONDecodeError:
+                raw = []
+        elif isinstance(data, (dict, list)):
+            raw = data
+        else:
             raw = []
         if isinstance(raw, dict):
             manager.__pick_cooldown = raw.get("cooldown_days", 3)

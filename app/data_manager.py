@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import json
 import os
 import shutil
 import tempfile
@@ -9,7 +10,27 @@ from pathlib import Path
 class DataManager:
 
     DEFAULT_FILE = "students_data.json"
-    DEFAULT_PAYLOAD = '{"cooldown_days":3,"students":[]}'
+    DEFAULT_PAYLOAD = json.dumps(
+        {
+            "version": 2,
+            "current_class_id": "class-default",
+            "classes": [
+                {
+                    "id": "class-default",
+                    "name": "杭州黑马 AI Python 就业 3期",
+                    "created_at": 0,
+                    "updated_at": 0,
+                    "last_used_at": 0,
+                    "order": 0,
+                    "data": {
+                        "cooldown_days": 3,
+                        "students": [],
+                    },
+                }
+            ],
+        },
+        ensure_ascii=False,
+    )
 
     _data_dir: Path | None = None
     _data_path: Path | None = None
