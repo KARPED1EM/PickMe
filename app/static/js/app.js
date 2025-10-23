@@ -46,14 +46,16 @@ function scheduleResultNameFit() {
 
 function fitResultNameContent() {
     const element = dom.resultName;
-    if (!element || element.classList.contains("is-placeholder")) {
-        if (element) {
-            element.style.removeProperty("font-size");
-        }
+    if (!element) {
         return;
     }
-    const height = element.clientHeight;
-    if (!height) {
+    if (element.classList.contains("is-placeholder")) {
+        element.style.removeProperty("font-size");
+        return;
+    }
+    const container = element.parentElement;
+    const availableHeight = container ? container.clientHeight : element.clientHeight;
+    if (!availableHeight) {
         return;
     }
     element.style.removeProperty("font-size");
@@ -65,7 +67,7 @@ function fitResultNameContent() {
     const minSize = 16;
     let steps = 0;
     const limit = 48;
-    while (element.scrollHeight > element.clientHeight && steps < limit && size > minSize) {
+    while (element.scrollHeight > availableHeight && steps < limit && size > minSize) {
         size -= 1.5;
         element.style.fontSize = `${size}px`;
         steps += 1;

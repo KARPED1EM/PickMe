@@ -258,16 +258,20 @@ textarea::-webkit-input-placeholder {
     width: 100%;
 }
 
-.result-name {
-    position: relative;
+.result-name-shell {
     display: flex;
-    align-items: center;
-    align-content: center;
+    align-items: flex-end;
     justify-content: flex-start;
-    flex-wrap: wrap;
-    gap: 0.35rem;
     width: 100%;
     height: clamp(3.8rem, 9vw, 5.8rem);
+    max-width: 100%;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.result-name {
+    display: block;
+    width: 100%;
     max-width: 100%;
     font-size: var(--result-name-size, clamp(3rem, 9vw, 5.2rem));
     font-weight: 700;
@@ -276,20 +280,24 @@ textarea::-webkit-input-placeholder {
     text-align: left;
     color: #ffffff;
     white-space: normal;
-    overflow: hidden;
+    overflow-wrap: anywhere;
+    word-break: break-word;
     transition: color 0.2s ease;
 }
 
 .result-name.is-placeholder,
 .result-name.is-text {
-    flex-wrap: nowrap;
-    gap: 0;
+    display: block;
 }
 
 .result-name.is-names {
     --result-name-size: clamp(2rem, 6vw, 3.4rem);
-    align-content: flex-start;
     line-height: 1.15;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-content: flex-end;
+    align-items: flex-end;
 }
 
 .result-name-item {
