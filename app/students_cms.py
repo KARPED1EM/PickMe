@@ -333,10 +333,10 @@ class StudentsCms:
     def register_random_pick(self, students: list[Student]) -> None:
         timestamp = time.time()
         for student in students:
-            student.register_pick(timestamp)
+            student.register_pick(timestamp, self.__pick_cooldown)
 
     def force_cooldown(self, student: Student) -> None:
-        student.set_last_pick(time.time())
+        student.apply_cooldown(time.time(), self.__pick_cooldown)
 
     def force_end_cooldown(self, student: Student) -> None:
         student.force_pickable()
@@ -428,7 +428,7 @@ class StudentsCms:
         else:
             students_data = raw
         for item in students_data:
-            student = Student.deserialize(item)
+            student = Student.deserialize(item, default_cooldown_days=manager.__pick_cooldown)
             manager.add_student(student)
         manager.load_history(history_payload)
         return manager

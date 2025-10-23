@@ -164,7 +164,7 @@ const state = {
     isModeMenuOpen: false
 };
 
-const TOAST_DEFAULT_DURATION = 4200;
+const TOAST_DEFAULT_DURATION = 2400;
 const toastStates = new Map();
 let toastPauseDepth = 0;
 let animationInterval = null;
@@ -998,7 +998,7 @@ async function handleClassSwitchRequest(classId) {
         closeModal();
         showToast(`已切换至 ${state.currentClassName}`, "success");
     } catch (error) {
-        showToast(error.message, "error");
+        showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -1031,7 +1031,7 @@ async function handleClassDeleteRequest(classId) {
         render();
         showToast("班级已删除", "success");
     } catch (error) {
-        showToast(error.message, "error");
+        showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -1127,7 +1127,7 @@ async function handleClassAddSubmit(event) {
         showToast("班级已添加", "success");
         closeModal();
     } catch (error) {
-        showToast(error.message || "添加失败", "error");
+        showToast(error.message || "添加失败", error.status || "error");
     } finally {
         if (!state.isAnimating) setBusy(false);
     }
@@ -1144,7 +1144,7 @@ async function submitClassReorder(order) {
         render();
         showToast("班级排序已更新", "success");
     } catch (error) {
-        showToast(error.message, "error");
+        showToast(error.message, error.status);
         updateClassModal();
     } finally {
         if (!state.isAnimating) {
@@ -1191,7 +1191,7 @@ async function handleCooldownSave(value) {
         showToast("冷却时间已更新", "success");
         closeModal();
     } catch (error) {
-        showToast(error.message, "error");
+        showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -1220,7 +1220,7 @@ async function handleClearCooldown() {
         render();
         showToast("冷却列表已清空", "success");
     } catch (error) {
-        showToast(error.message, "error");
+        showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -1390,7 +1390,7 @@ async function runSimpleAction(action, payload, message) {
             showToast(message, "success");
         }
     } catch (error) {
-        showToast(error.message, "error");
+        showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -1553,7 +1553,7 @@ async function submitHistoryNote(entryId, note) {
         closeModal();
         showToast("备注已保存", "success");
     } catch (error) {
-        showToast(error.message, "error");
+        showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -1580,7 +1580,7 @@ async function handleHistoryDelete(entry) {
         render();
         showToast("已删除历史记录", "success");
     } catch (error) {
-        showToast(error.message, "error");
+        showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -1618,8 +1618,8 @@ function handleBatchPick() {
         return;
     }
     const raw = Number(dom.batchCount.value);
-    if (!Number.isFinite(raw) || raw < 1) {
-        showToast('请输入正确的抽取人数', "warning");
+    if (!Number.isFinite(raw) || raw < 1 || raw > 20) {
+        showToast('请输入正确的抽取人数（1-20）', "warning");
         dom.batchCount.focus();
         dom.batchCount.select();
         return;
@@ -2072,7 +2072,7 @@ async function handleHistoryClear(studentId) {
         render();
         showToast("已清空历史记录", "success");
     } catch (error) {
-        showToast(error.message, "error");
+        showToast(error.message, error.status);
     } finally {
         setBusy(false);
     }
@@ -2089,7 +2089,7 @@ async function handleHistoryRemove(studentId, timestamp) {
         render();
         showToast("已删除记录", "success");
     } catch (error) {
-        showToast(error.message, "error");
+        showToast(error.message, error.status);
     } finally {
         setBusy(false);
     }
@@ -2396,7 +2396,7 @@ async function submitStudentCreate(payload) {
         showToast("已添加学生", "success");
         closeModal();
     } catch (error) {
-        showToast(error.message, "error");
+        showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -2413,7 +2413,7 @@ async function submitStudentUpdate(payload) {
         showToast("已保存修改", "success");
         closeModal();
     } catch (error) {
-        showToast(error.message, "error");
+        showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -2433,7 +2433,7 @@ async function handleStudentDelete(student) {
         showToast("已删除学生", "success");
         closeModal();
     } catch (error) {
-        showToast(error.message, "error");
+        showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -2457,7 +2457,7 @@ async function handleRandom(mode, extra = {}) {
         }
         render();
     } catch (error) {
-        showToast(error.message, "error");
+        showToast(error.message, error.status);
         resetSelection();
     } finally {
         if (!state.isAnimating) {
@@ -2770,7 +2770,9 @@ async function sendAction(action, data) {
         result = {};
     }
     if (!response.ok) {
-        throw new Error(result.message || "操作失败");
+        const error = new Error(result.message || "操作失败");
+        error.status = response.status;
+        throw error;
     }
     return result;
 }
@@ -3141,7 +3143,18 @@ function showToast(message, options) {
     if (!stack) {
         return null;
     }
-    const config = typeof options === "string" ? { type: options } : options || {};
+
+    let config;
+    if (typeof options === "number") {
+        config = { type: options === 400 ? "warning" : "error" };
+    } 
+    else if (typeof options === "string") {
+        config = { type: options };
+    } 
+    else {
+        config = options || { type: "error"};
+    }
+
     const type = normalizeToastType(config.type);
     const duration = Math.max(2400, Number(config.duration) || TOAST_DEFAULT_DURATION);
     const text = message === undefined || message === null ? "" : String(message);

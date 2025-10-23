@@ -1,5 +1,8 @@
-﻿import json
+import json
 import uuid
+
+
+_SECONDS_PER_DAY = 60 * 60 * 24
 
 
 class Student:
@@ -11,6 +14,8 @@ class Student:
         pick_count: int = 0,
         pick_history: list[float] | None = None,
         student_id: str | None = None,
+        cooldown_started_at: float = 0.0,
+        cooldown_expires_at: float = 0.0,
     ) -> None:
         self.__id = (student_id or str(uuid.uuid4())).strip()
         self.__name = name.strip()
@@ -28,6 +33,12 @@ class Student:
             self.__pick_history.append(self.__last_pick)
         if self.__pick_count < len(self.__pick_history):
             self.__pick_count = len(self.__pick_history)
+        self.__cooldown_started_at = self.__parse_float(cooldown_started_at)
+        self.__cooldown_expires_at = self.__parse_float(cooldown_expires_at)
+        if self.__cooldown_started_at < 0.0:
+            self.__cooldown_started_at = 0.0
+        if self.__cooldown_expires_at < self.__cooldown_started_at:
+            self.__cooldown_expires_at = self.__cooldown_started_at
 
     @staticmethod
     def __parse_int(value) -> int:
@@ -35,6 +46,13 @@ class Student:
             return int(value)
         except (TypeError, ValueError):
             return 0
+
+    @staticmethod
+    def __parse_float(value) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
 
     @property
     def student_id(self) -> str:
@@ -60,6 +78,14 @@ class Student:
     def pick_history(self) -> list[float]:
         return list(self.__pick_history)
 
+    @property
+    def cooldown_started_at(self) -> float:
+        return self.__cooldown_started_at
+
+    @property
+    def cooldown_expires_at(self) -> float:
+        return self.__cooldown_expires_at
+
     def update(self, name: str, group: int) -> None:
         self.__name = name.strip()
         self.__group = max(0, self.__parse_int(group))
@@ -72,25 +98,33 @@ class Student:
     ) -> bool:
         if ignore_cooldown:
             return True
-        if self.__last_pick == 0.0:
-            return True
-        return current_time - self.__last_pick >= cooldown * 60 * 60 * 24
+        return current_time >= self.__cooldown_expires_at
 
     def pick_cooldown_remaining(self, current_time: float, cooldown: int) -> float:
-        if self.__last_pick == 0.0:
+        if self.__cooldown_expires_at <= 0.0:
             return 0.0
-        return max(0.0, (self.__last_pick + cooldown * 60 * 60 * 24) - current_time)
+        return max(0.0, self.__cooldown_expires_at - current_time)
 
-    def set_last_pick(self, timestamp: float) -> None:
-        self.__last_pick = float(timestamp)
+    def apply_cooldown(self, start_timestamp: float, cooldown_days: int) -> None:
+        duration_days = max(0, int(cooldown_days))
+        if duration_days <= 0:
+            self.force_pickable()
+            return
+        start_value = float(start_timestamp)
+        if start_value < 0.0:
+            start_value = 0.0
+        self.__cooldown_started_at = start_value
+        self.__cooldown_expires_at = start_value + duration_days * _SECONDS_PER_DAY
 
     def force_pickable(self) -> None:
-        self.__last_pick = 0.0
+        self.__cooldown_started_at = 0.0
+        self.__cooldown_expires_at = 0.0
 
     def clear_history(self) -> None:
         self.__pick_history.clear()
         self.__pick_count = 0
         self.__last_pick = 0.0
+        self.force_pickable()
 
     def remove_history_entry(self, timestamp: float, tolerance: float = 1e-6) -> bool:
         try:
@@ -104,19 +138,28 @@ class Student:
                 break
         if index is None:
             return False
-        self.__pick_history.pop(index)
+        previous_last_pick = self.__last_pick
+        removed_value = self.__pick_history.pop(index)
         if self.__pick_history:
             self.__last_pick = max(self.__pick_history)
         else:
             self.__last_pick = 0.0
         self.__pick_count = len(self.__pick_history)
+        if (
+            abs(previous_last_pick - removed_value) <= tolerance
+            or abs(self.__cooldown_started_at - removed_value) <= tolerance
+        ):
+            self.force_pickable()
         return True
 
-    def register_pick(self, timestamp: float) -> None:
+    def register_pick(self, timestamp: float, cooldown_days: int) -> None:
         value = float(timestamp)
+        if value < 0.0:
+            value = 0.0
         self.__last_pick = value
         self.__pick_count += 1
         self.__pick_history.append(value)
+        self.apply_cooldown(value, cooldown_days)
 
     def to_dict(self, current_time: float, cooldown: int) -> dict:
         return {
@@ -124,6 +167,8 @@ class Student:
             "name": self.__name,
             "group": self.__group,
             "last_pick": self.__last_pick,
+            "cooldown_started_at": self.__cooldown_started_at,
+            "cooldown_expires_at": self.__cooldown_expires_at,
             "remaining_cooldown": self.pick_cooldown_remaining(current_time, cooldown),
             "pick_count": self.__pick_count,
             "pick_history": list(self.__pick_history),
@@ -137,10 +182,12 @@ class Student:
             "last_pick": self.__last_pick,
             "pick_count": self.__pick_count,
             "pick_history": list(self.__pick_history),
+            "cooldown_started_at": self.__cooldown_started_at,
+            "cooldown_expires_at": self.__cooldown_expires_at,
         }
 
     @staticmethod
-    def deserialize(data) -> "Student":
+    def deserialize(data, default_cooldown_days: int | None = None) -> "Student":
         if isinstance(data, str):
             obj = json.loads(data)
         else:
@@ -158,11 +205,27 @@ class Student:
         except (TypeError, ValueError):
             pick_count_value = 0
         name_value = str(obj.get("name", "")).strip()
-        return Student(
+        cooldown_started_at = obj.get("cooldown_started_at", 0.0)
+        cooldown_expires_at = obj.get("cooldown_expires_at", 0.0)
+        cooldown_payload = obj.get("cooldown")
+        if isinstance(cooldown_payload, dict):
+            cooldown_started_at = cooldown_payload.get("started_at", cooldown_started_at)
+            cooldown_expires_at = cooldown_payload.get("expires_at", cooldown_expires_at)
+        student = Student(
             student_id=obj.get("id"),
             name=name_value,
             group=group_value,
             last_pick=obj.get("last_pick", 0.0),
             pick_count=pick_count_value,
             pick_history=pick_history,
+            cooldown_started_at=cooldown_started_at,
+            cooldown_expires_at=cooldown_expires_at,
         )
+        if (
+            student.cooldown_expires_at == 0.0
+            and student.last_pick > 0.0
+            and default_cooldown_days is not None
+            and default_cooldown_days > 0
+        ):
+            student.apply_cooldown(student.last_pick, default_cooldown_days)
+        return student

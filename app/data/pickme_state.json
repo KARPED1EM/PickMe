@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "current_class_id": "class-ithm",
   "current_class": {
     "id": "class-ithm",
@@ -36,7 +36,9 @@
           "group": 4,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "2",
@@ -44,7 +46,9 @@
           "group": 4,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "3",
@@ -52,7 +56,9 @@
           "group": 19,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "4",
@@ -60,7 +66,9 @@
           "group": 17,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "5",
@@ -68,7 +76,9 @@
           "group": 17,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "6",
@@ -76,7 +86,9 @@
           "group": 6,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "7",
@@ -84,7 +96,9 @@
           "group": 16,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "8",
@@ -92,7 +106,9 @@
           "group": 12,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "9",
@@ -100,7 +116,9 @@
           "group": 12,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "10",
@@ -108,7 +126,9 @@
           "group": 17,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "11",
@@ -116,7 +136,9 @@
           "group": 18,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "12",
@@ -124,7 +146,9 @@
           "group": 12,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "13",
@@ -132,7 +156,9 @@
           "group": 7,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "14",
@@ -140,7 +166,9 @@
           "group": 18,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "15",
@@ -148,7 +176,9 @@
           "group": 14,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "16",
@@ -156,7 +186,9 @@
           "group": 1,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "17",
@@ -164,7 +196,9 @@
           "group": 1,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "18",
@@ -172,7 +206,9 @@
           "group": 6,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "19",
@@ -180,7 +216,9 @@
           "group": 13,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "20",
@@ -188,7 +226,9 @@
           "group": 7,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "21",
@@ -196,7 +236,9 @@
           "group": 1,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "22",
@@ -204,7 +246,9 @@
           "group": 14,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "23",
@@ -212,7 +256,9 @@
           "group": 18,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "24",
@@ -220,7 +266,9 @@
           "group": 15,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "25",
@@ -228,7 +276,9 @@
           "group": 2,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "26",
@@ -236,7 +286,9 @@
           "group": 14,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "27",
@@ -244,7 +296,9 @@
           "group": 15,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "28",
@@ -252,7 +306,9 @@
           "group": 3,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "29",
@@ -260,7 +316,9 @@
           "group": 10,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "30",
@@ -268,7 +326,9 @@
           "group": 13,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "31",
@@ -276,7 +336,9 @@
           "group": 3,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "32",
@@ -284,7 +346,9 @@
           "group": 6,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "33",
@@ -292,7 +356,9 @@
           "group": 9,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "34",
@@ -300,7 +366,9 @@
           "group": 3,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "35",
@@ -308,7 +376,9 @@
           "group": 5,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "36",
@@ -316,7 +386,9 @@
           "group": 9,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "37",
@@ -324,7 +396,9 @@
           "group": 9,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "38",
@@ -332,7 +406,9 @@
           "group": 19,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "39",
@@ -340,7 +416,9 @@
           "group": 1,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "40",
@@ -348,7 +426,9 @@
           "group": 11,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "41",
@@ -356,7 +436,9 @@
           "group": 9,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "42",
@@ -364,7 +446,9 @@
           "group": 10,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "43",
@@ -372,7 +456,9 @@
           "group": 12,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "44",
@@ -380,7 +466,9 @@
           "group": 19,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "45",
@@ -388,7 +476,9 @@
           "group": 5,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "46",
@@ -396,7 +486,9 @@
           "group": 7,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "47",
@@ -404,7 +496,9 @@
           "group": 11,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "48",
@@ -412,7 +506,9 @@
           "group": 2,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "49",
@@ -420,7 +516,9 @@
           "group": 10,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "50",
@@ -428,7 +526,9 @@
           "group": 13,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "51",
@@ -436,7 +536,9 @@
           "group": 17,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "52",
@@ -444,7 +546,9 @@
           "group": 16,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "53",
@@ -452,7 +556,9 @@
           "group": 15,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "54",
@@ -460,7 +566,9 @@
           "group": 15,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "55",
@@ -468,7 +576,9 @@
           "group": 2,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "56",
@@ -476,7 +586,9 @@
           "group": 5,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "57",
@@ -484,7 +596,9 @@
           "group": 8,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "58",
@@ -492,7 +606,9 @@
           "group": 11,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "59",
@@ -500,7 +616,9 @@
           "group": 8,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "60",
@@ -508,7 +626,9 @@
           "group": 11,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "61",
@@ -516,7 +636,9 @@
           "group": 18,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "62",
@@ -524,7 +646,9 @@
           "group": 20,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "63",
@@ -532,7 +656,9 @@
           "group": 12,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "64",
@@ -540,7 +666,9 @@
           "group": 10,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "65",
@@ -548,7 +676,9 @@
           "group": 13,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "66",
@@ -556,7 +686,9 @@
           "group": 17,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "67",
@@ -564,7 +696,9 @@
           "group": 16,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "68",
@@ -572,7 +706,9 @@
           "group": 19,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "69",
@@ -580,7 +716,9 @@
           "group": 2,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "70",
@@ -588,7 +726,9 @@
           "group": 8,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "71",
@@ -596,7 +736,9 @@
           "group": 19,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "72",
@@ -604,7 +746,9 @@
           "group": 18,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "73",
@@ -612,7 +756,9 @@
           "group": 11,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "74",
@@ -620,7 +766,9 @@
           "group": 14,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "75",
@@ -628,7 +776,9 @@
           "group": 4,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         },
         {
           "id": "76",
@@ -636,7 +786,9 @@
           "group": 3,
           "last_pick": 0.0,
           "pick_count": 0,
-          "pick_history": []
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
         }
       ],
       "history": {
