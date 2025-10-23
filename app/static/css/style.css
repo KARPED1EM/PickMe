@@ -385,8 +385,8 @@ textarea::-webkit-input-placeholder {
 }
 
 .switch-ghost .form-check-input:checked {
-    background-color: rgba(114, 207, 255, 0.8);
-    border-color: rgba(114, 207, 255, 0.8);
+    background-color: rgb(255, 45, 99, 0.5);
+    border-color: rgb(255, 45, 99, 0.8);
 }
 
 .switch-ghost .form-check-input:focus {
@@ -396,6 +396,7 @@ textarea::-webkit-input-placeholder {
 .switch-ghost .form-check-label {
     margin: 0;
     font-weight: 600;
+    font-size: small;
     letter-spacing: 0.02em;
     cursor: pointer;
 }
@@ -406,7 +407,6 @@ textarea::-webkit-input-placeholder {
     display: flex;
     flex-direction: column;
     gap: 0.45rem;
-    min-width: 0;
 }
 
 .result-action-split {
@@ -429,7 +429,7 @@ textarea::-webkit-input-placeholder {
     align-items: flex-start;
     justify-content: center;
     gap: 0;
-    padding-inline: 1.4rem;
+    padding-inline: 3rem;
     min-height: 3rem;
 }
 

@@ -134,6 +134,65 @@ function setResultNameNames(values) {
     applyResultName(list, "names");
 }
 
+const DRAW_MODE_ALIASES = {
+    single: "single",
+    any: "single",
+    student: "single",
+    batch: "batch",
+    group: "group",
+};
+
+function normalizeDrawMode(value) {
+    const key = typeof value === "string" ? value.trim().toLowerCase() : "";
+    return DRAW_MODE_ALIASES[key] || "single";
+}
+
+function normalizeResultStudents(entries) {
+    if (!Array.isArray(entries)) {
+        return [];
+    }
+    const normalized = [];
+    for (const item of entries) {
+        if (!item || typeof item !== "object") {
+            continue;
+        }
+        const id = item.id ?? item.student_id ?? item.studentId;
+        if (!id) {
+            continue;
+        }
+        const name = typeof item.name === "string" ? item.name : String(item.name || "");
+        const groupValue = toFiniteNumber(item.group ?? item.group_id ?? item.groupId);
+        normalized.push({
+            id: String(id),
+            name,
+            group: groupValue,
+        });
+    }
+    return normalized;
+}
+
+function normalizeIdList(source) {
+    if (!Array.isArray(source)) {
+        return [];
+    }
+    const list = [];
+    for (const item of source) {
+        if (item === undefined || item === null) {
+            continue;
+        }
+        const id = String(item).trim();
+        if (id) {
+            list.push(id);
+        }
+    }
+    return list;
+}
+
+function toFiniteNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+}
+
 const STORAGE_MODE = window.__APP_STORAGE_MODE__ || "filesystem";
 const USE_BROWSER_STORAGE = STORAGE_MODE === "browser";
 const STORAGE_KEY = "pickme::payload";
@@ -160,7 +219,7 @@ const state = {
     contextTarget: null,
     historyStudentId: null,
     classDragSource: null,
-    pickMode: "any",
+    pickMode: "single",
     isModeMenuOpen: false
 };
 
@@ -190,7 +249,7 @@ const timeShortFormatter = new Intl.DateTimeFormat("zh-CN", {
     hour12: false
 });
 const WEEKDAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-const PICK_MODE_LABELS = { any: "抽取一人", batch: "抽取多人", group: "抽取小组" };
+const PICK_MODE_LABELS = { single: "抽取一人", batch: "抽取多人", group: "抽取小组" };
 
 window.addEventListener("resize", scheduleResultNameFit, { passive: true });
 
@@ -201,7 +260,7 @@ function init() {
     const initialState = loadInitialState();
     applyAppState(initialState);
     bindEvents();
-    setPickMode(state.pickMode || "any", { silent: true, skipControls: true });
+    setPickMode(state.pickMode || "single", { silent: true, skipControls: true });
     render();
 }
 
@@ -532,7 +591,7 @@ function renderHistoryEntry(entry) {
 
 function renderStudentItem(student) {
     const color = groupColor(student.group);
-    const lastSince = student.last_pick ? formatSince(student.last_pick) : null;
+    const remaining = `冷却 ${formatDuration(student.remaining_cooldown)}`;
     const domId = buildDomId("student", student.id);
     return `<li id="${domId}" class="student-item${student.is_cooling ? " is-cooling" : ""}" data-id="${escapeHtml(String(student.id))}" data-cooling="${student.is_cooling ? "1" : "0"}" style="--group-color:${color}">
     <div class="student-item-main">
@@ -542,7 +601,7 @@ function renderStudentItem(student) {
       </div>
       <div class="student-meta">
         <span>共 ${student.pick_count} 次</span>
-        ${lastSince ? `<span>${escapeHtml(lastSince)}</span>` : ""}
+        <span class="student-cooldown">${escapeHtml(remaining)}</span>
       </div>
     </div>
   </li>`;
@@ -1602,7 +1661,7 @@ function handlePickAction() {
         handleRandom('group');
         return;
     }
-    handleRandom('any');
+    handleRandom('single');
 }
 
 function handleBatchPick() {
@@ -1708,8 +1767,7 @@ function closeModeMenu() {
 }
 
 function setPickMode(mode, options = {}) {
-    const allowed = ['any', 'batch', 'group'];
-    const normalized = allowed.includes(mode) ? mode : 'any';
+    const normalized = normalizeDrawMode(mode);
     const changed = normalized !== state.pickMode;
     state.pickMode = normalized;
     syncPickModeUI();
@@ -1727,7 +1785,7 @@ function setPickMode(mode, options = {}) {
 
 function syncPickModeUI() {
     if (dom.resultModeDisplay) {
-        const label = PICK_MODE_LABELS[state.pickMode] || PICK_MODE_LABELS.any;
+        const label = PICK_MODE_LABELS[state.pickMode] || PICK_MODE_LABELS.single;
         dom.resultModeDisplay.textContent = label;
     }
     if (dom.batchField) {
@@ -2446,11 +2504,17 @@ async function handleRandom(mode, extra = {}) {
         return;
     }
     closeContextMenu();
+    const normalizedMode = normalizeDrawMode(mode);
     setBusy(true);
     try {
-        const response = await sendAction("random_pick", { mode, ignore_cooldown: state.ignoreCooldown, ...extra });
-        const historyEntryId = response && response.result && response.result.history_entry_id ? String(response.result.history_entry_id) : "";
-        await runSelectionAnimation(response.result);
+        const response = await sendAction("random_pick", {
+            mode: normalizedMode,
+            ignore_cooldown: state.ignoreCooldown,
+            ...extra,
+        });
+        const result = response && typeof response === "object" ? response.result : null;
+        const historyEntryId = result && result.history_entry_id ? String(result.history_entry_id) : "";
+        await runSelectionAnimation(result);
         applyAppState(response.state);
         if (historyEntryId) {
             state.historyHighlightId = historyEntryId;
@@ -2479,30 +2543,64 @@ function runSelectionAnimation(result) {
         resetSelection();
         return Promise.resolve();
     }
-    const type = result.type || "single";
-    let finalIds = [];
-    if (type === "group") {
-        finalIds = Array.isArray(result.student_ids) ? result.student_ids.filter(Boolean) : [];
-    } else if (type === "batch") {
-        finalIds = Array.isArray(result.student_ids) ? result.student_ids.filter(Boolean) : [];
-    } else if (result.student_id) {
-        finalIds = [result.student_id];
+    const mode = normalizeDrawMode(result.mode || result.type);
+    const snapshotStudents = normalizeResultStudents(result.students);
+    let finalIds = snapshotStudents.map(student => student.id);
+    if (!finalIds.length) {
+        if (Array.isArray(result.student_ids)) {
+            finalIds = normalizeIdList(result.student_ids);
+        } else if (result.student_id) {
+            finalIds = normalizeIdList([result.student_id]);
+        }
     }
     if (!finalIds.length) {
         resetSelection();
         return Promise.resolve();
     }
-    const pool = Array.isArray(result.pool_ids) ? result.pool_ids.filter(Boolean) : [];
-    const rawGroup = Number(result.group);
-    const finalGroup = type === "group" ? Number.isFinite(rawGroup) ? rawGroup : inferGroupFromIds(finalIds) : null;
-    const frames = type === "group" ? buildGroupAnimationSequence(getGroupPool(), finalGroup) : buildAnimationSequence(pool, finalIds);
+    const poolStudents = [];
+    if (result.pool && typeof result.pool === "object") {
+        poolStudents.push(...normalizeIdList(result.pool.students));
+    }
+    if (!poolStudents.length && Array.isArray(result.pool_ids)) {
+        poolStudents.push(...normalizeIdList(result.pool_ids));
+    }
+    if (!poolStudents.length && Array.isArray(result.student_ids)) {
+        poolStudents.push(...normalizeIdList(result.student_ids));
+    }
+    const poolGroups = [];
+    if (result.pool && typeof result.pool === "object" && Array.isArray(result.pool.groups)) {
+        for (const value of result.pool.groups) {
+            const number = toFiniteNumber(value);
+            if (number !== null) {
+                poolGroups.push(number);
+            }
+        }
+    }
+    const finalGroup = mode === "group"
+        ? (() => {
+            const direct = toFiniteNumber(result.group);
+            if (direct !== null) {
+                return direct;
+            }
+            for (const item of snapshotStudents) {
+                const groupValue = toFiniteNumber(item.group);
+                if (groupValue !== null) {
+                    return groupValue;
+                }
+            }
+            return toFiniteNumber(inferGroupFromIds(finalIds));
+        })()
+        : null;
+    const frames = mode === "group"
+        ? buildGroupAnimationSequence(poolGroups.length ? poolGroups : getGroupPool(), finalGroup)
+        : buildAnimationSequence(poolStudents.length ? poolStudents : finalIds, finalIds);
     state.isAnimating = true;
     updateControls();
     dom.resultCard.classList.add("is-animating");
     dom.resultNote.textContent = "正在抽取...";
     let index = 0;
     let showFrame;
-    if (type === "group") {
+    if (mode === "group") {
         showFrame = value => {
             const numeric = Number(value);
             setResultNameText(Number.isFinite(numeric) ? `第 ${numeric} 组` : "--");
@@ -3217,4 +3315,314 @@ function showToast(message, options) {
     startToastLoop(state);
 
     return toast;
+}
+function resolveSelectionStudents(selection) {
+    if (!selection) {
+        return [];
+    }
+    const source = Array.isArray(selection.students) ? selection.students : [];
+    const snapshotMap = new Map(source.map(item => [String(item.id), {
+        id: String(item.id),
+        name: typeof item.name === "string" ? item.name : String(item.name || ""),
+        group: toFiniteNumber(item.group),
+    }]));
+    const resolved = [];
+    const ids = Array.isArray(selection.studentIds) ? selection.studentIds : [];
+    for (const rawId of ids) {
+        const id = String(rawId);
+        if (!id) {
+            continue;
+        }
+        const student = state.studentsMap.get(id);
+        if (student) {
+            resolved.push({
+                id: student.id,
+                name: student.name,
+                group: toFiniteNumber(student.group),
+            });
+            continue;
+        }
+        const fallback = snapshotMap.get(id);
+        if (fallback) {
+            resolved.push({ ...fallback });
+        }
+    }
+    if (!resolved.length) {
+        resolved.push(...snapshotMap.values());
+    }
+    return resolved;
+}
+
+function finalizeSelection(mode, finalIds, result, snapshots) {
+    const normalizedMode = normalizeDrawMode(mode);
+    const snapshotMap = new Map((Array.isArray(snapshots) ? snapshots : []).map(item => [String(item.id), {
+        id: String(item.id),
+        name: typeof item.name === "string" ? item.name : String(item.name || ""),
+        group: toFiniteNumber(item.group),
+    }]));
+    const students = [];
+    for (const rawId of finalIds) {
+        const id = String(rawId);
+        if (!id) {
+            continue;
+        }
+        const student = state.studentsMap.get(id);
+        if (student) {
+            students.push({
+                id: student.id,
+                name: student.name,
+                group: toFiniteNumber(student.group),
+            });
+            continue;
+        }
+        const fallback = snapshotMap.get(id);
+        if (fallback) {
+            students.push({ ...fallback });
+        }
+    }
+    if (!students.length) {
+        students.push(...snapshotMap.values());
+    }
+    let groupValue = null;
+    if (normalizedMode === "group") {
+        const direct = toFiniteNumber(result && result.group);
+        if (direct !== null) {
+            groupValue = direct;
+        } else {
+            const withGroup = students.find(item => toFiniteNumber(item.group) !== null);
+            if (withGroup) {
+                groupValue = toFiniteNumber(withGroup.group);
+            } else {
+                for (const value of snapshotMap.values()) {
+                    const numeric = toFiniteNumber(value.group);
+                    if (numeric !== null) {
+                        groupValue = numeric;
+                        break;
+                    }
+                }
+                if (groupValue === null) {
+                    groupValue = toFiniteNumber(inferGroupFromIds(finalIds));
+                }
+            }
+        }
+    } else if (students.length) {
+        groupValue = toFiniteNumber(students[0].group);
+        if (groupValue === null) {
+            const fallback = snapshotMap.get(String(finalIds[0]));
+            if (fallback) {
+                groupValue = toFiniteNumber(fallback.group);
+            }
+        }
+    }
+    const requested = Number(result && result.requested_count);
+    const requestedCount = Number.isFinite(requested) && requested > 0
+        ? Math.floor(requested)
+        : students.length || finalIds.length || 1;
+    state.lastSelection = {
+        mode: normalizedMode,
+        studentIds: finalIds.slice(),
+        students,
+        group: groupValue,
+        requestedCount,
+        ignoreCooldown: !!(result && result.ignore_cooldown),
+        historyEntryId: result && result.history_entry_id ? String(result.history_entry_id) : "",
+    };
+}
+
+function runSelectionAnimation(result) {
+    if (animationInterval) {
+        clearInterval(animationInterval);
+        animationInterval = null;
+    }
+    if (animationTimeout) {
+        clearTimeout(animationTimeout);
+        animationTimeout = null;
+    }
+    if (!result) {
+        resetSelection();
+        return Promise.resolve();
+    }
+    const mode = normalizeDrawMode(result.mode || result.type);
+    const snapshotStudents = normalizeResultStudents(result.students);
+    let finalIds = snapshotStudents.map(student => student.id);
+    if (!finalIds.length) {
+        if (Array.isArray(result.student_ids)) {
+            finalIds = normalizeIdList(result.student_ids);
+        } else if (result.student_id) {
+            finalIds = normalizeIdList([result.student_id]);
+        }
+    }
+    if (!finalIds.length) {
+        resetSelection();
+        return Promise.resolve();
+    }
+    const poolStudents = [];
+    if (result.pool && typeof result.pool === "object") {
+        poolStudents.push(...normalizeIdList(result.pool.students));
+    }
+    if (!poolStudents.length && Array.isArray(result.pool_ids)) {
+        poolStudents.push(...normalizeIdList(result.pool_ids));
+    }
+    if (!poolStudents.length && Array.isArray(result.student_ids)) {
+        poolStudents.push(...normalizeIdList(result.student_ids));
+    }
+    const poolGroups = [];
+    if (result.pool && typeof result.pool === "object" && Array.isArray(result.pool.groups)) {
+        for (const value of result.pool.groups) {
+            const number = toFiniteNumber(value);
+            if (number !== null) {
+                poolGroups.push(number);
+            }
+        }
+    }
+    const finalGroup = mode === "group"
+        ? (() => {
+            const direct = toFiniteNumber(result.group);
+            if (direct !== null) {
+                return direct;
+            }
+            for (const item of snapshotStudents) {
+                const groupValue = toFiniteNumber(item.group);
+                if (groupValue !== null) {
+                    return groupValue;
+                }
+            }
+            return toFiniteNumber(inferGroupFromIds(finalIds));
+        })()
+        : null;
+    const frames = mode === "group"
+        ? buildGroupAnimationSequence(poolGroups.length ? poolGroups : getGroupPool(), finalGroup)
+        : buildAnimationSequence(poolStudents.length ? poolStudents : finalIds, finalIds);
+    const snapshotMap = new Map(snapshotStudents.map(student => [student.id, student]));
+    state.isAnimating = true;
+    updateControls();
+    dom.resultCard.classList.add("is-animating");
+    dom.resultNote.textContent = "正在抽取...";
+    let index = 0;
+    const finishDelay = 140;
+    const interval = 95;
+    const showFrame = mode === "group"
+        ? value => {
+            const numeric = Number(value);
+            setResultNameText(Number.isFinite(numeric) ? `第 ${numeric} 组` : "--");
+        }
+        : id => {
+            const student = state.studentsMap.get(id) || snapshotMap.get(id);
+            setResultNameText(student ? student.name : "--");
+        };
+    return new Promise(resolve => {
+        const finish = () => {
+            finalizeSelection(mode, finalIds, result, snapshotStudents);
+            dom.resultCard.classList.remove("is-animating");
+            state.isAnimating = false;
+            updateControls();
+            renderSelection();
+            resolve();
+        };
+        if (!frames.length) {
+            finish();
+            return;
+        }
+        showFrame(frames[0]);
+        index = 1;
+        if (frames.length === 1) {
+            animationTimeout = setTimeout(() => {
+                animationTimeout = null;
+                finish();
+            }, finishDelay);
+            return;
+        }
+        animationInterval = setInterval(() => {
+            showFrame(frames[index]);
+            index += 1;
+            if (index >= frames.length) {
+                clearInterval(animationInterval);
+                animationInterval = null;
+                animationTimeout = setTimeout(() => {
+                    animationTimeout = null;
+                    finish();
+                }, finishDelay);
+            }
+        }, interval);
+    });
+}
+
+function renderSelection() {
+    if (!state.lastSelection) {
+        setResultNamePlaceholder();
+        dom.resultNote.textContent = "等待抽取";
+        return;
+    }
+    const selection = state.lastSelection;
+    const students = resolveSelectionStudents(selection);
+    selection.students = students;
+    const mode = selection.mode || "single";
+    if (mode === "batch") {
+        const names = students.map(student => student.name).filter(Boolean);
+        setResultNameNames(names);
+        const count = selection.studentIds ? selection.studentIds.length : names.length;
+        dom.resultNote.textContent = count ? `抽取多人 · 共 ${count} 人` : "抽取多人";
+        return;
+    }
+    if (mode === "group") {
+        const names = students.map(student => student.name).filter(Boolean);
+        setResultNameNames(names);
+        const groupValue = toFiniteNumber(selection.group);
+        if (names.length) {
+            dom.resultNote.textContent = groupValue !== null ? `第 ${groupValue} 组` : "小组抽取";
+        } else if (groupValue !== null) {
+            dom.resultNote.textContent = `第 ${groupValue} 组 · 成员已冷却`;
+        } else {
+            dom.resultNote.textContent = "小组抽取";
+        }
+        return;
+    }
+    const student = students[0];
+    if (student) {
+        setResultNameText(student.name || "--");
+        const groupValue = toFiniteNumber(student.group ?? selection.group);
+        dom.resultNote.textContent = groupValue !== null ? `来自第 ${groupValue} 组` : "抽取一人";
+    } else {
+        setResultNamePlaceholder();
+        dom.resultNote.textContent = "抽取一人";
+    }
+}
+
+function syncSelection() {
+    if (!state.lastSelection) {
+        return;
+    }
+    const selection = state.lastSelection;
+    const students = resolveSelectionStudents(selection);
+    selection.students = students;
+    if (selection.mode === "single" && students.length) {
+        selection.group = toFiniteNumber(students[0].group);
+    } else if (selection.mode === "group") {
+        const withGroup = students.find(item => toFiniteNumber(item.group) !== null);
+        if (withGroup) {
+            selection.group = toFiniteNumber(withGroup.group);
+        } else {
+            selection.group = toFiniteNumber(selection.group);
+            if (selection.group === null) {
+                selection.group = toFiniteNumber(inferGroupFromIds(selection.studentIds || []));
+            }
+        }
+    }
+}
+
+function getSuggestedBatchCount(available) {
+    if (!available) {
+        return 0;
+    }
+    let last = 3;
+    if (state.lastSelection && state.lastSelection.mode === "batch") {
+        const idsLength = Array.isArray(state.lastSelection.studentIds) ? state.lastSelection.studentIds.length : 0;
+        if (idsLength) {
+            last = idsLength;
+        } else if (Number.isFinite(state.lastSelection.requestedCount)) {
+            last = Number(state.lastSelection.requestedCount);
+        }
+    }
+    const fallback = Number.isFinite(last) && last > 0 ? Math.floor(last) : 2;
+    return Math.min(available, Math.max(1, fallback));
 }

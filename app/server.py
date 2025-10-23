@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import random
 import time
 from pathlib import Path
 from typing import Any, Callable
@@ -12,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .classrooms import ClassroomsState
-from .students_cms import DrawHistoryEntry
+from .draw_service import DrawError, DrawRequest, DrawService
 from .storage import create_storage_backend
 
 ERROR_TEXT = {
@@ -54,6 +53,7 @@ def create_app(
         app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
     storage = create_storage_backend(storage_mode, user_data_dir, default_data_dir)
     app.state.storage = storage
+    draw_service = DrawService()
 
     def current_timestamp() -> float:
         return time.time()
@@ -92,125 +92,6 @@ def create_app(
     def error_response(message: str, status: int = 400) -> JSONResponse:
         return JSONResponse(status_code=status, content={"message": message})
 
-    def run_single_random(
-        state: ClassroomsState, ignore_cooldown: bool
-    ) -> JSONResponse:
-        cms = state.current_cms
-        students = cms.eligible_students(ignore_cooldown=ignore_cooldown)
-        if not students:
-            raise ValueError("no_students_available")
-        chosen = random.choice(students)
-        cms.register_random_pick([chosen])
-        entry = cms.record_history_entry(
-            DrawHistoryEntry(
-                mode="single",
-                students=[
-                    {
-                        "id": chosen.student_id,
-                        "name": chosen.name,
-                        "group": chosen.group,
-                    }
-                ],
-                requested_count=1,
-                ignore_cooldown=ignore_cooldown,
-            )
-        )
-        result = {
-            "type": "student",
-            "class_id": state.current_class_id,
-            "student_id": chosen.student_id,
-            "pool_ids": [student.student_id for student in students],
-            "history_entry_id": entry.entry_id,
-        }
-        return build_response(state, result=result, persist=True, touch="modified")
-
-    def run_group_random(state: ClassroomsState, ignore_cooldown: bool) -> JSONResponse:
-        cms = state.current_cms
-        effective_ignore = bool(ignore_cooldown)
-        groups = cms.eligible_groups(ignore_cooldown=effective_ignore)
-        if not groups:
-            raise ValueError("no_groups_available")
-        group_value = random.choice(groups)
-        now = current_timestamp()
-        members = [
-            student
-            for student in cms.get_students()
-            if student.group == group_value
-            and student.pickable(now, cms.pick_cooldown, effective_ignore)
-        ]
-        if not members:
-            raise ValueError("no_students_available")
-        cms.register_random_pick(members)
-        entry = cms.record_history_entry(
-            DrawHistoryEntry(
-                mode="group",
-                students=[
-                    {
-                        "id": member.student_id,
-                        "name": member.name,
-                        "group": member.group,
-                    }
-                    for member in members
-                ],
-                group=group_value,
-                requested_count=len(members),
-                ignore_cooldown=effective_ignore,
-            )
-        )
-        result = {
-            "type": "group",
-            "class_id": state.current_class_id,
-            "group": group_value,
-            "student_ids": [student.student_id for student in members],
-            "pool_ids": [student.student_id for student in members],
-            "history_entry_id": entry.entry_id,
-        }
-        return build_response(state, result=result, persist=True, touch="modified")
-
-    def run_batch_random(
-        state: ClassroomsState,
-        ignore_cooldown: bool,
-        requested_count: int,
-    ) -> JSONResponse:
-        cms = state.current_cms
-        try:
-            count = int(requested_count)
-        except (TypeError, ValueError):
-            raise ValueError("batch_count_invalid")
-        if count < 1:
-            raise ValueError("batch_count_invalid")
-        students = cms.eligible_students(ignore_cooldown=ignore_cooldown)
-        if not students:
-            raise ValueError("no_students_available")
-        if count > len(students):
-            raise ValueError("batch_count_exceeds_available")
-        chosen = random.sample(students, count)
-        cms.register_random_pick(chosen)
-        entry = cms.record_history_entry(
-            DrawHistoryEntry(
-                mode="batch",
-                students=[
-                    {
-                        "id": student.student_id,
-                        "name": student.name,
-                        "group": student.group,
-                    }
-                    for student in chosen
-                ],
-                requested_count=count,
-                ignore_cooldown=ignore_cooldown,
-            )
-        )
-        result = {
-            "type": "batch",
-            "class_id": state.current_class_id,
-            "student_ids": [student.student_id for student in chosen],
-            "pool_ids": [student.student_id for student in students],
-            "requested_count": count,
-            "history_entry_id": entry.entry_id,
-        }
-        return build_response(state, result=result, persist=True, touch="modified")
-
     def handle_set_cooldown(
         state: ClassroomsState, data: dict[str, Any]
     ) -> JSONResponse:
@@ -244,15 +125,16 @@ def create_app(
     def handle_random_pick(
         state: ClassroomsState, data: dict[str, Any]
     ) -> JSONResponse:
-        mode = str(data.get("mode") or "any").lower()
-        ignore_cooldown = bool(data.get("ignore_cooldown"))
-        if mode in {"any", "single", "student"}:
-            return run_single_random(state, ignore_cooldown)
-        if mode == "batch":
-            return run_batch_random(state, ignore_cooldown, data.get("count"))
-        if mode == "group":
-            return run_group_random(state, ignore_cooldown)
-        raise ValueError("unsupported_random_mode")
+        request = DrawRequest.from_payload(data)
+        outcome = draw_service.execute(
+            state, request, timestamp=current_timestamp()
+        )
+        return build_response(
+            state,
+            result=outcome.to_payload(),
+            persist=True,
+            touch="modified",
+        )
 
     def handle_student_create(
         state: ClassroomsState, data: dict[str, Any]
@@ -560,6 +442,8 @@ def create_app(
         state = storage.load(data)
         try:
             return handler(state, data)
+        except DrawError as error:
+            return error_response(translate_error(error.code), status=400)
         except ValueError as error:
             return error_response(translate_error(str(error)), status=400)
         except KeyError as error:

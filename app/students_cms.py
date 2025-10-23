@@ -330,10 +330,12 @@ class StudentsCms:
                 eligible.append(group_id)
         return sorted(eligible)
 
-    def register_random_pick(self, students: list[Student]) -> None:
-        timestamp = time.time()
+    def register_random_pick(
+        self, students: list[Student], *, timestamp: float | None = None
+    ) -> None:
+        moment = time.time() if timestamp is None else float(timestamp)
         for student in students:
-            student.register_pick(timestamp, self.__pick_cooldown)
+            student.register_pick(moment, self.__pick_cooldown)
 
     def force_cooldown(self, student: Student) -> None:
         student.apply_cooldown(time.time(), self.__pick_cooldown)
