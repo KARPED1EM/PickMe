@@ -426,7 +426,7 @@ function renderHistoryEntry(entry) {
 
 function renderStudentItem(student) {
     const color = groupColor(student.group);
-    const cooldown = student.is_cooling ? `冷却 ${formatDuration(student.remaining_cooldown)}` : "";
+    const lastSince = student.last_pick ? formatSince(student.last_pick) : null;
     const domId = buildDomId("student", student.id);
     return `<li id="${domId}" class="student-item${student.is_cooling ? " is-cooling" : ""}" data-id="${escapeHtml(String(student.id))}" data-cooling="${student.is_cooling ? "1" : "0"}" style="--group-color:${color}">
     <div class="student-item-main">
@@ -435,8 +435,8 @@ function renderStudentItem(student) {
         <span class="student-badge">组 ${escapeHtml(String(student.group))}</span>
       </div>
       <div class="student-meta">
-        <span>抽 ${student.pick_count} 次</span>
-        ${student.is_cooling ? `<span class="student-cooldown">${escapeHtml(cooldown)}</span>` : ""}
+        <span>共 ${student.pick_count} 次</span>
+        ${lastSince ? `<span>${escapeHtml(lastSince)}</span>` : ""}
       </div>
     </div>
   </li>`;
@@ -556,7 +556,6 @@ function highlightHistoryEntry() {
 function renderCooldownItem(student) {
     const color = groupColor(student.group);
     const remaining = `剩余 ${formatDuration(student.remaining_cooldown)}`;
-    const last = student.last_pick ? `上次 ${formatTime(student.last_pick)}` : "暂无记录";
     const domId = buildDomId("cooling", student.id);
     return `<li id="${domId}" class="student-item is-cooling" data-id="${escapeHtml(String(student.id))}" data-cooling="1" style="--group-color:${color}">
     <div class="student-item-main">
@@ -566,7 +565,6 @@ function renderCooldownItem(student) {
       </div>
       <div class="student-meta">
         <span class="student-cooldown">${escapeHtml(remaining)}</span>
-        <span>${escapeHtml(last)}</span>
       </div>
     </div>
   </li>`;
@@ -725,7 +723,7 @@ function buildClassModal() {
     </div>
     <div class="class-modal-body">
       <div class="class-toolbar">
-        <button type="button" class="btn btn-accent btn-sm" id="class-add-btn">添加班级</button>
+        <button type="button" class="btn btn-accent class-toolbar-btn" id="class-add-btn">添加班级</button>
         <span class="class-toolbar-note">拖拽列表可调整班级顺序</span>
       </div>
       <ul id="class-list" class="class-list">
@@ -786,9 +784,18 @@ function buildClassItem(meta) {
     const id = String(meta.id || "");
     const isActive = id === state.currentClassId;
     const deleteDisabled = state.classes.length <= 1 ? " disabled" : "";
-    const switchDisabled = isActive ? " disabled" : "";
-    const lastUsedText = meta.last_used_at > 0 ? `最近 ${formatSince(meta.last_used_at)}` : "尚未使用";
-    const createdText = meta.created_at > 0 ? formatDate(meta.created_at) : "--";
+    const lastUsedText = meta.last_used_at > 0 ? `最近${formatSince(meta.last_used_at)}使用` : "尚未使用";
+    const createdText = meta.created_at > 0 ? `创建于 ${formatDate(meta.created_at)}` : "";
+    const metaSegments = [
+        `${meta.student_count} 人`,
+        `冷却 ${meta.cooldown_days} 天`,
+        lastUsedText,
+        createdText
+    ].filter(Boolean);
+    const metaHtml = metaSegments.map((segment, index) => {
+        const separator = index === 0 ? "" : '<span class="class-item-meta-separator">·</span>';
+        return `${separator}<span class="class-item-meta-entry">${escapeHtml(segment)}</span>`;
+    }).join("");
     return `
   <li class="class-item${isActive ? " is-active" : ""}" draggable="true" data-class-id="${escapeHtml(id)}">
     <div class="class-item-handle" aria-hidden="true" data-class-handle>
@@ -796,16 +803,10 @@ function buildClassItem(meta) {
     </div>
     <div class="class-item-main" data-class-switch>
       <div class="class-item-name">${escapeHtml(meta.name)}</div>
-      <div class="class-item-meta">
-        <span>${meta.student_count} 人</span>
-        <span>冷却 ${meta.cooldown_days} 天</span>
-        <span>${escapeHtml(lastUsedText)}</span>
-        <span>创建于 ${escapeHtml(createdText)}</span>
-      </div>
+      <div class="class-item-meta">${metaHtml}</div>
     </div>
     <div class="class-item-actions">
-      <button type="button" class="btn btn-ghost btn-xs" data-class-switch${switchDisabled}>${isActive ? "当前班级" : "切换"}</button>
-      <button type="button" class="btn btn-ghost btn-xs" data-class-delete${deleteDisabled}>删除</button>
+      <button type="button" class="btn btn-danger" data-class-delete${deleteDisabled}>删除</button>
     </div>
   </li>`;
 }
@@ -1699,7 +1700,7 @@ function getSuggestedBatchCount(available) {
     if (!available) {
         return 0;
     }
-    let last = 2;
+    let last = 3;
     if (state.lastSelection && state.lastSelection.type === 'batch') {
         if (Array.isArray(state.lastSelection.ids)) {
             last = state.lastSelection.ids.length;
@@ -2093,16 +2094,17 @@ function buildCooldownModal(currentDays) {
 function buildConfirmModal(options) {
     const { title = "确认操作", message = "", confirmLabel = "确认", cancelLabel = "取消", confirmTone = "accent" } = options || {};
     const confirmClass = confirmTone === "danger" ? "btn btn-danger" : "btn btn-accent";
+    const headerToneClass = confirmTone === "danger" ? "modal-header confirm-modal-header is-danger" : "modal-header confirm-modal-header";
     return `<div class="modal-backdrop">
-    <div class="modal-panel glass">
-      <div class="modal-header">
+    <div class="modal-panel glass confirm-modal">
+      <div class="${headerToneClass}">
         <h3>${escapeHtml(title)}</h3>
         <button type="button" class="btn btn-icon" data-modal-close aria-label="关闭">×</button>
       </div>
-      <div class="modal-body slim-scroll">
-        <p class="text-muted">${escapeHtml(message)}</p>
+      <div class="modal-body slim-scroll confirm-modal-body">
+        <p>${escapeHtml(message)}</p>
       </div>
-      <div class="modal-footer">
+      <div class="modal-footer confirm-modal-footer">
         <button type="button" class="btn btn-outline-light" data-modal-close>${escapeHtml(cancelLabel)}</button>
         <button type="button" class="${confirmClass}" data-confirm>${escapeHtml(confirmLabel)}</button>
       </div>
@@ -2152,19 +2154,22 @@ function buildStudentModal(mode, student) {
       <form id="student-form">
         <div class="modal-body slim-scroll">
           <div class="row g-3">
-            <div class="col-12 col-md-6">
+            <div class="col-12 col-md-3">
               <label class="form-label">学号</label>
-              <input name="student_id" type="text" class="form-control" value="${escapeHtml(student.id)}" autocomplete="off">
+                <input name="student_id" type="text" class="form-control"
+                  value="${escapeHtml(student.id)}" autocomplete="off">
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label">小组</label>
+              <input name="group" type="number" class="form-control"
+                min="0" step="1" value="${escapeHtml(String(student.group))}">
             </div>
             <div class="col-12 col-md-6">
-              <label class="form-label">小组</label>
-              <input name="group" type="number" class="form-control" min="0" step="1" value="${escapeHtml(String(student.group))}">
+               <label class="form-label">姓名</label>
+              <input name="name" type="text" class="form-control"
+                value="${escapeHtml(student.name)}" required autocomplete="off">
             </div>
-            <div class="col-12">
-              <label class="form-label">姓名</label>
-              <input name="name" type="text" class="form-control" value="${escapeHtml(student.name)}" required autocomplete="off">
             </div>
-          </div>
           <div class="student-info-grid mt-3">
             <div>
               <span class="info-label">累计点名</span>
@@ -2866,6 +2871,21 @@ function formatDuration(seconds) {
     return parts.join(" ");
 }
 
+function formatRelativeValue(value, unit) {
+    if (value === 1) {
+        if (unit === "分钟") {
+            return "一分钟";
+        }
+        if (unit === "小时") {
+            return "一小时";
+        }
+        if (unit === "天") {
+            return "一天";
+        }
+    }
+    return `${value}${unit}`;
+}
+
 function formatSince(timestamp) {
     const now = Date.now() / 1000;
     const diff = Math.max(0, Math.floor(now - Number(timestamp)));
@@ -2873,12 +2893,15 @@ function formatSince(timestamp) {
         return "刚刚";
     }
     if (diff < 3600) {
-        return `${Math.floor(diff / 60)} 分钟前`;
+        const minutes = Math.floor(diff / 60);
+        return `${formatRelativeValue(minutes, "分钟")}前`;
     }
     if (diff < 86400) {
-        return `${Math.floor(diff / 3600)} 小时前`;
+        const hours = Math.floor(diff / 3600);
+        return `${formatRelativeValue(hours, "小时")}前`;
     }
-    return `${Math.floor(diff / 86400)} 天前`;
+    const days = Math.floor(diff / 86400);
+    return `${formatRelativeValue(days, "天")}前`;
 }
 
 function escapeHtml(value) {
