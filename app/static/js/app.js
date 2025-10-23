@@ -24,7 +24,7 @@ const dom = {
     classSwitcherLabel: $("class-switcher-label"),
     contextMenu: $("context-menu"),
     modalRoot: $("modal-root"),
-    toast: $("toast"),
+    toastStack: $("toast-stack"),
     resultCard: document.querySelector(".result-card"),
     historyList: $("history-list"),
     historyGroups: $("history-groups"),
@@ -164,7 +164,9 @@ const state = {
     isModeMenuOpen: false
 };
 
-let toastTimer = null;
+const TOAST_DEFAULT_DURATION = 4200;
+const toastStates = new Map();
+let toastPauseDepth = 0;
 let animationInterval = null;
 let animationTimeout = null;
 const modalStack = [];
@@ -994,9 +996,9 @@ async function handleClassSwitchRequest(classId) {
         applyAppState(response.state);
         render();
         closeModal();
-        showToast(`已切换至 ${state.currentClassName}`);
+        showToast(`已切换至 ${state.currentClassName}`, "success");
     } catch (error) {
-        showToast(error.message);
+        showToast(error.message, "error");
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -1010,7 +1012,7 @@ async function handleClassDeleteRequest(classId) {
     }
     const meta = state.classMap.get(classId);
     if (!meta) {
-        showToast("未找到指定班级");
+        showToast("未找到指定班级", "warning");
         return;
     }
     const confirmed = await openConfirmModal({
@@ -1027,9 +1029,9 @@ async function handleClassDeleteRequest(classId) {
         const response = await sendAction("class_delete", { class_id: classId });
         applyAppState(response.state);
         render();
-        showToast("班级已删除");
+        showToast("班级已删除", "success");
     } catch (error) {
-        showToast(error.message);
+        showToast(error.message, "error");
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -1106,13 +1108,13 @@ async function handleClassAddSubmit(event) {
     const input = form.querySelector("#class-add-name");
     const name = (input?.value || "").trim();
     if (!name) {
-        showToast("班级名称不能为空");
+        showToast("班级名称不能为空", "warning");
         input?.focus();
         return;
     }
     const duplicated = state.classes.some(c => c.name.trim().toLowerCase() === name.toLowerCase());
     if (duplicated) {
-        showToast("班级名称已存在");
+        showToast("班级名称已存在", "warning");
         input.focus();
         input.select();
         return;
@@ -1122,10 +1124,10 @@ async function handleClassAddSubmit(event) {
         const response = await sendAction("class_create", { name });
         applyAppState(response.state);
         render();
-        showToast("班级已添加");
+        showToast("班级已添加", "success");
         closeModal();
     } catch (error) {
-        showToast(error.message || "添加失败");
+        showToast(error.message || "添加失败", "error");
     } finally {
         if (!state.isAnimating) setBusy(false);
     }
@@ -1140,9 +1142,9 @@ async function submitClassReorder(order) {
         const response = await sendAction("class_reorder", { order });
         applyAppState(response.state);
         render();
-        showToast("班级排序已更新");
+        showToast("班级排序已更新", "success");
     } catch (error) {
-        showToast(error.message);
+        showToast(error.message, "error");
         updateClassModal();
     } finally {
         if (!state.isAnimating) {
@@ -1165,7 +1167,7 @@ function classOrderEquals(a, b) {
 async function handleCooldownSave(value) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric) || numeric < 1) {
-        showToast("冷却天数必须是整数");
+        showToast("冷却天数必须是整数", "warning");
         const input = dom.modalRoot.querySelector("#cooldown-days");
         if (input) {
             input.focus();
@@ -1186,10 +1188,10 @@ async function handleCooldownSave(value) {
         const response = await sendAction("set_cooldown", { days: target });
         applyAppState(response.state);
         render();
-        showToast("冷却时间已更新");
+        showToast("冷却时间已更新", "success");
         closeModal();
     } catch (error) {
-        showToast(error.message);
+        showToast(error.message, "error");
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -1216,9 +1218,9 @@ async function handleClearCooldown() {
         const response = await sendAction("clear_cooldown");
         applyAppState(response.state);
         render();
-        showToast("冷却列表已清空");
+        showToast("冷却列表已清空", "success");
     } catch (error) {
-        showToast(error.message);
+        showToast(error.message, "error");
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -1385,10 +1387,10 @@ async function runSimpleAction(action, payload, message) {
         applyAppState(response.state);
         render();
         if (message) {
-            showToast(message);
+            showToast(message, "success");
         }
     } catch (error) {
-        showToast(error.message);
+        showToast(error.message, "error");
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -1435,7 +1437,7 @@ function openStudentModal(mode, studentId) {
     if (mode === "edit") {
         student = state.studentsMap.get(studentId);
         if (!student) {
-            showToast("未找到该学生");
+            showToast("未找到该学生", "warning");
             return;
         }
     }
@@ -1497,7 +1499,7 @@ function openHistoryNoteModal(entry) {
             event.preventDefault();
             const value = textarea ? textarea.value.trim() : "";
             if (value.length > 200) {
-                showToast("备注最多 200 字");
+                showToast("备注最多 200 字", "warning");
                 if (textarea) {
                     textarea.focus();
                 }
@@ -1549,9 +1551,9 @@ async function submitHistoryNote(entryId, note) {
         state.historyHighlightId = entryId;
         render();
         closeModal();
-        showToast("备注已保存");
+        showToast("备注已保存", "success");
     } catch (error) {
-        showToast(error.message);
+        showToast(error.message, "error");
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -1576,9 +1578,9 @@ async function handleHistoryDelete(entry) {
         const response = await sendAction("history_entry_delete", { entry_id: entry.id });
         applyAppState(response.state);
         render();
-        showToast("已删除历史记录");
+        showToast("已删除历史记录", "success");
     } catch (error) {
-        showToast(error.message);
+        showToast(error.message, "error");
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -1606,7 +1608,7 @@ function handlePickAction() {
 function handleBatchPick() {
     const available = getAvailableStudentCount();
     if (!available) {
-        showToast('当前没有可抽取的学生');
+        showToast('当前没有可抽取的学生', "warning");
         syncBatchInput();
         return;
     }
@@ -1617,14 +1619,14 @@ function handleBatchPick() {
     }
     const raw = Number(dom.batchCount.value);
     if (!Number.isFinite(raw) || raw < 1) {
-        showToast('请输入正确的抽取人数');
+        showToast('请输入正确的抽取人数', "warning");
         dom.batchCount.focus();
         dom.batchCount.select();
         return;
     }
     const count = Math.floor(raw);
     if (count > available) {
-        showToast('超出可抽取范围');
+        showToast('超出可抽取范围', "warning");
         dom.batchCount.value = String(available);
         dom.batchCount.focus();
         dom.batchCount.select();
@@ -1998,7 +2000,7 @@ function openHistoryModal(studentId) {
     closeContextMenu();
     const student = state.studentsMap.get(studentId);
     if (!student) {
-        showToast("未找到该学生");
+        showToast("未找到该学生", "warning");
         return;
     }
     const content = buildHistoryModal(student);
@@ -2049,11 +2051,11 @@ async function handleHistoryClear(studentId) {
     }
     const student = state.studentsMap.get(studentId);
     if (!student) {
-        showToast("未找到该学生");
+        showToast("未找到该学生", "warning");
         return;
     }
     if (!student.pick_history.length) {
-        showToast("暂无记录");
+        showToast("暂无记录", "info");
         return;
     }
     const confirmed = await openConfirmModal({
@@ -2068,9 +2070,9 @@ async function handleHistoryClear(studentId) {
         const response = await sendAction("student_history_clear", { student_id: studentId });
         applyAppState(response.state);
         render();
-        showToast("已清空历史记录");
+        showToast("已清空历史记录", "success");
     } catch (error) {
-        showToast(error.message);
+        showToast(error.message, "error");
     } finally {
         setBusy(false);
     }
@@ -2085,9 +2087,9 @@ async function handleHistoryRemove(studentId, timestamp) {
         const response = await sendAction("student_history_remove", { student_id: studentId, timestamp });
         applyAppState(response.state);
         render();
-        showToast("已删除记录");
+        showToast("已删除记录", "success");
     } catch (error) {
-        showToast(error.message);
+        showToast(error.message, "error");
     } finally {
         setBusy(false);
     }
@@ -2336,21 +2338,21 @@ async function handleStudentFormSubmit(mode, context) {
     const idValue = idInput ? idInput.value.trim() : "";
     const nameValue = nameInput.value.trim();
     if (!nameValue) {
-        showToast("姓名不能为空");
+        showToast("姓名不能为空", "warning");
         nameInput.focus();
         nameInput.select();
         return;
     }
     const groupValue = sanitizeGroup(groupInput.value);
     if (groupValue < 0) {
-        showToast("小组必须为非负整数");
+        showToast("小组必须为非负整数", "warning");
         groupInput.focus();
         groupInput.select();
         return;
     }
     if (mode === "create") {
         if (idValue && state.studentsMap.has(idValue)) {
-            showToast("学号已存在");
+            showToast("学号已存在", "warning");
             if (idInput) {
                 idInput.focus();
                 idInput.select();
@@ -2358,7 +2360,7 @@ async function handleStudentFormSubmit(mode, context) {
             return;
         }
         if (studentNameExists(nameValue)) {
-            showToast("姓名已存在");
+            showToast("姓名已存在", "warning");
             nameInput.focus();
             nameInput.select();
             return;
@@ -2369,7 +2371,7 @@ async function handleStudentFormSubmit(mode, context) {
     const currentId = context.student.id;
     const targetId = idValue || currentId;
     if (targetId !== currentId && state.studentsMap.has(targetId)) {
-        showToast("学号已存在");
+        showToast("学号已存在", "warning");
         if (idInput) {
             idInput.focus();
             idInput.select();
@@ -2377,7 +2379,7 @@ async function handleStudentFormSubmit(mode, context) {
         return;
     }
     if (studentNameExists(nameValue, currentId)) {
-        showToast("姓名已存在");
+        showToast("姓名已存在", "warning");
         nameInput.focus();
         nameInput.select();
         return;
@@ -2391,10 +2393,10 @@ async function submitStudentCreate(payload) {
         const response = await sendAction("student_create", payload);
         applyAppState(response.state);
         render();
-        showToast("已添加学生");
+        showToast("已添加学生", "success");
         closeModal();
     } catch (error) {
-        showToast(error.message);
+        showToast(error.message, "error");
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -2408,10 +2410,10 @@ async function submitStudentUpdate(payload) {
         const response = await sendAction("student_update", payload);
         applyAppState(response.state);
         render();
-        showToast("已保存修改");
+        showToast("已保存修改", "success");
         closeModal();
     } catch (error) {
-        showToast(error.message);
+        showToast(error.message, "error");
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -2428,10 +2430,10 @@ async function handleStudentDelete(student) {
         const response = await sendAction("student_delete", { student_id: student.id });
         applyAppState(response.state);
         render();
-        showToast("已删除学生");
+        showToast("已删除学生", "success");
         closeModal();
     } catch (error) {
-        showToast(error.message);
+        showToast(error.message, "error");
     } finally {
         if (!state.isAnimating) {
             setBusy(false);
@@ -2455,7 +2457,7 @@ async function handleRandom(mode, extra = {}) {
         }
         render();
     } catch (error) {
-        showToast(error.message);
+        showToast(error.message, "error");
         resetSelection();
     } finally {
         if (!state.isAnimating) {
@@ -3036,11 +3038,170 @@ function buildDomId(prefix, value) {
     return `${prefix}-${segment}`;
 }
 
-function showToast(message) {
-    dom.toast.textContent = message;
-    dom.toast.classList.add("show");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => {
-        dom.toast.classList.remove("show");
-    }, 2400);
+function normalizeToastType(value) {
+    const text = typeof value === "string" ? value.trim().toLowerCase() : "";
+    if (!text) {
+        return "info";
+    }
+    if (["error", "danger", "fail", "failed"].includes(text)) {
+        return "error";
+    }
+    if (["warn", "warning", "caution", "alert"].includes(text)) {
+        return "warning";
+    }
+    if (["success", "ok", "done", "passed"].includes(text)) {
+        return "success";
+    }
+    return "info";
+}
+
+function handleToastHover(entering) {
+    const now = performance.now();
+    if (entering) {
+        toastPauseDepth += 1;
+    } else {
+        toastPauseDepth = Math.max(0, toastPauseDepth - 1);
+    }
+    toastStates.forEach(state => {
+        state.lastTimestamp = now;
+        if (!entering && toastPauseDepth === 0 && !state.raf) {
+            state.raf = requestAnimationFrame(timestamp => advanceToast(state, timestamp));
+        }
+    });
+}
+
+function startToastLoop(state) {
+    if (!state) {
+        return;
+    }
+    if (state.raf) {
+        cancelAnimationFrame(state.raf);
+    }
+    state.lastTimestamp = performance.now();
+    state.raf = requestAnimationFrame(timestamp => advanceToast(state, timestamp));
+}
+
+function advanceToast(state, timestamp) {
+    if (!state || !toastStates.has(state.toast)) {
+        return;
+    }
+    if (toastPauseDepth > 0) {
+        state.lastTimestamp = timestamp;
+        state.raf = requestAnimationFrame(next => advanceToast(state, next));
+        return;
+    }
+    const delta = Math.max(0, timestamp - state.lastTimestamp);
+    state.lastTimestamp = timestamp;
+    state.remaining = Math.max(0, state.remaining - delta);
+    const progress = state.remaining / state.duration;
+    state.progressBar.style.setProperty("--progress", progress.toFixed(4));
+    if (state.remaining <= 0) {
+        dismissToast(state.toast);
+        return;
+    }
+    state.raf = requestAnimationFrame(next => advanceToast(state, next));
+}
+
+function dismissToast(toast) {
+    if (!toast) {
+        return;
+    }
+    if (toast.matches(":hover")) {
+        handleToastHover(false);
+    }
+    const state = toastStates.get(toast);
+    if (state) {
+        if (state.raf) {
+            cancelAnimationFrame(state.raf);
+        }
+        toastStates.delete(toast);
+        state.progressBar.style.setProperty("--progress", "0");
+    }
+    if (toast.classList.contains("is-leaving")) {
+        return;
+    }
+    toast.classList.add("is-leaving");
+    let removed = false;
+    const removeToast = () => {
+        if (removed) {
+            return;
+        }
+        removed = true;
+        toast.removeEventListener("animationend", removeToast);
+        if (toast.parentElement) {
+            toast.parentElement.removeChild(toast);
+        }
+    };
+    toast.addEventListener("animationend", removeToast);
+    setTimeout(removeToast, 420);
+}
+
+function showToast(message, options) {
+    const stack = dom.toastStack;
+    if (!stack) {
+        return null;
+    }
+    const config = typeof options === "string" ? { type: options } : options || {};
+    const type = normalizeToastType(config.type);
+    const duration = Math.max(2400, Number(config.duration) || TOAST_DEFAULT_DURATION);
+    const text = message === undefined || message === null ? "" : String(message);
+
+    const toast = document.createElement("div");
+    toast.className = "toast-item";
+    toast.dataset.type = type;
+    toast.setAttribute("role", "status");
+    toast.setAttribute("aria-live", type === "error" ? "assertive" : "polite");
+    toast.setAttribute("aria-atomic", "true");
+
+    const body = document.createElement("div");
+    body.className = "toast-body";
+
+    const pip = document.createElement("div");
+    pip.className = "toast-pip";
+    body.appendChild(pip);
+
+    const messageElement = document.createElement("div");
+    messageElement.className = "toast-message";
+    messageElement.textContent = text || "提示";
+    body.appendChild(messageElement);
+
+    const closeButton = document.createElement("button");
+    closeButton.type = "button";
+    closeButton.className = "toast-close";
+    closeButton.setAttribute("aria-label", "关闭提示");
+    const closeIcon = document.createElement("span");
+    closeIcon.setAttribute("aria-hidden", "true");
+    closeIcon.textContent = "×";
+    closeButton.appendChild(closeIcon);
+    body.appendChild(closeButton);
+
+    toast.appendChild(body);
+
+    const progress = document.createElement("div");
+    progress.className = "toast-progress";
+    const progressBar = document.createElement("div");
+    progressBar.className = "toast-progress-bar";
+    progressBar.style.setProperty("--progress", "1");
+    progress.appendChild(progressBar);
+    toast.appendChild(progress);
+
+    closeButton.addEventListener("click", () => dismissToast(toast));
+    toast.addEventListener("mouseenter", () => handleToastHover(true));
+    toast.addEventListener("mouseleave", () => handleToastHover(false));
+
+    stack.prepend(toast);
+
+    const state = {
+        toast,
+        duration,
+        remaining: duration,
+        lastTimestamp: performance.now(),
+        progressBar,
+        raf: 0
+    };
+
+    toastStates.set(toast, state);
+    startToastLoop(state);
+
+    return toast;
 }

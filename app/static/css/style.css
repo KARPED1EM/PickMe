@@ -1482,25 +1482,182 @@ textarea::-webkit-input-placeholder {
     font-size: 0.8rem;
 }
 
-.toast {
+.toast-stack {
     position: fixed;
+    top: clamp(16px, 4vw, 32px);
     left: 50%;
-    bottom: 32px;
     transform: translateX(-50%);
-    padding: 12px 20px;
-    border-radius: 999px;
-    opacity: 0;
-    transition: opacity 0.25s ease, transform 0.25s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    width: min(460px, calc(100vw - 32px));
+    z-index: 1600;
     pointer-events: none;
-    color: #f7f9ff;
-    background: rgba(18, 22, 36, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    z-index: 1400;
 }
 
-.toast.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(-6px);
+.toast-item {
+    --toast-accent: #60c0ff;
+    --toast-background: rgba(21, 26, 42, 0.94);
+    --toast-glow: rgba(96, 192, 255, 0.45);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px 22px 20px 28px;
+    border-radius: 20px;
+    color: #f7f9ff;
+    font-size: 0.96rem;
+    line-height: 1.55;
+    background: var(--toast-background);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(24px);
+    box-shadow: 0 24px 42px rgba(6, 12, 30, 0.55);
+    pointer-events: auto;
+    opacity: 0;
+    transform: translateY(-12px) scale(0.94);
+    animation: toast-enter 0.38s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+.toast-item::before {
+    content: "";
+    position: absolute;
+    top: 16px;
+    bottom: 16px;
+    left: 12px;
+    width: 4px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.4), transparent);
+    background-color: var(--toast-accent);
+    box-shadow: 0 0 14px var(--toast-glow);
+}
+
+.toast-item[data-type="success"] {
+    --toast-accent: #68f29a;
+    --toast-background: rgba(20, 42, 32, 0.95);
+    --toast-glow: rgba(104, 242, 154, 0.45);
+}
+
+.toast-item[data-type="warning"] {
+    --toast-accent: #ffcc70;
+    --toast-background: rgba(49, 35, 14, 0.95);
+    --toast-glow: rgba(255, 204, 112, 0.45);
+}
+
+.toast-item[data-type="error"] {
+    --toast-accent: #ff6d7d;
+    --toast-background: rgba(48, 18, 26, 0.95);
+    --toast-glow: rgba(255, 109, 125, 0.5);
+}
+
+.toast-body {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.toast-pip {
+    width: 12px;
+    height: 12px;
+    margin-top: 2px;
+    border-radius: 999px;
+    background: var(--toast-accent);
+    box-shadow: 0 0 12px var(--toast-glow);
+    flex: 0 0 auto;
+}
+
+.toast-message {
+    flex: 1 1 auto;
+    font-weight: 600;
+    letter-spacing: 0.012em;
+    user-select: text;
+    cursor: text;
+}
+
+.toast-close {
+    appearance: none;
+    border: none;
+    background: none;
+    color: rgba(247, 249, 255, 0.7);
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 50%;
+    padding: 4px;
+    transition: transform 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+
+.toast-close:hover,
+.toast-close:focus-visible {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.12);
+    transform: scale(1.12);
+}
+
+.toast-progress {
+    position: relative;
+    height: 4px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.toast-progress-bar {
+    position: absolute;
+    inset: 0;
+    transform-origin: left;
+    transform: scaleX(var(--progress, 1));
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0));
+    background-color: var(--toast-accent);
+    transition: transform 0.12s linear;
+}
+
+.toast-item.is-leaving {
+    animation: toast-exit 0.26s cubic-bezier(0.55, 0, 0.55, 0.2) forwards;
+}
+
+@keyframes toast-enter {
+    0% {
+        opacity: 0;
+        transform: translateY(-18px) scale(0.9);
+    }
+    60% {
+        opacity: 1;
+        transform: translateY(4px) scale(1.02);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes toast-exit {
+    0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.9);
+    }
+}
+
+@media (max-width: 576px) {
+    .toast-stack {
+        width: min(100%, calc(100vw - 20px));
+        gap: 10px;
+    }
+
+    .toast-item {
+        padding: 16px 18px 18px 24px;
+        font-size: 0.94rem;
+    }
+
+    .toast-item::before {
+        left: 10px;
+    }
 }
 .user-data-path {
     position: fixed;
