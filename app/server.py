@@ -128,9 +128,6 @@ def create_app(
         cms = state.current_cms
         effective_ignore = bool(ignore_cooldown)
         groups = cms.eligible_groups(ignore_cooldown=effective_ignore)
-        if not groups and not effective_ignore:
-            groups = cms.eligible_groups(ignore_cooldown=True)
-            effective_ignore = True
         if not groups:
             raise ValueError("no_groups_available")
         group_value = random.choice(groups)
