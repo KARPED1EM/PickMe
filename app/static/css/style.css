@@ -259,15 +259,48 @@ textarea::-webkit-input-placeholder {
 }
 
 .result-name {
-    font-size: clamp(3rem, 9vw, 5.2rem);
+    position: relative;
+    display: flex;
+    align-items: center;
+    align-content: center;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    width: 100%;
+    height: clamp(3.8rem, 9vw, 5.8rem);
+    max-width: 100%;
+    font-size: var(--result-name-size, clamp(3rem, 9vw, 5.2rem));
     font-weight: 700;
     letter-spacing: 0.04em;
     line-height: 1.05;
     text-align: left;
-    width: 100%;
     color: #ffffff;
-    overflow-wrap: anywhere;
+    white-space: normal;
+    overflow: hidden;
     transition: color 0.2s ease;
+}
+
+.result-name.is-placeholder,
+.result-name.is-text {
+    flex-wrap: nowrap;
+    gap: 0;
+}
+
+.result-name.is-names {
+    --result-name-size: clamp(2rem, 6vw, 3.4rem);
+    align-content: flex-start;
+    line-height: 1.15;
+}
+
+.result-name-item {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.result-name-item:not(:last-child)::after {
+    content: "、";
+    margin-left: 0.1em;
 }
 
 .result-note {

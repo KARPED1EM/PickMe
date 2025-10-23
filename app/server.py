@@ -126,7 +126,11 @@ def create_app(
 
     def run_group_random(state: ClassroomsState, ignore_cooldown: bool) -> JSONResponse:
         cms = state.current_cms
-        groups = cms.eligible_groups(ignore_cooldown=ignore_cooldown)
+        effective_ignore = bool(ignore_cooldown)
+        groups = cms.eligible_groups(ignore_cooldown=effective_ignore)
+        if not groups and not effective_ignore:
+            groups = cms.eligible_groups(ignore_cooldown=True)
+            effective_ignore = True
         if not groups:
             raise ValueError("no_groups_available")
         group_value = random.choice(groups)
@@ -135,7 +139,7 @@ def create_app(
             student
             for student in cms.get_students()
             if student.group == group_value
-            and student.pickable(now, cms.pick_cooldown, ignore_cooldown)
+            and student.pickable(now, cms.pick_cooldown, effective_ignore)
         ]
         if not members:
             raise ValueError("no_students_available")
@@ -153,7 +157,7 @@ def create_app(
                 ],
                 group=group_value,
                 requested_count=len(members),
-                ignore_cooldown=ignore_cooldown,
+                ignore_cooldown=effective_ignore,
             )
         )
         result = {

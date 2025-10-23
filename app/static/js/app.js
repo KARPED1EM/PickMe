@@ -32,6 +32,108 @@ const dom = {
     resultControlsShell: document.querySelector('.result-controls-shell'),
 };
 
+let resultNameFitFrame = 0;
+
+function scheduleResultNameFit() {
+    if (resultNameFitFrame) {
+        cancelAnimationFrame(resultNameFitFrame);
+    }
+    resultNameFitFrame = requestAnimationFrame(() => {
+        resultNameFitFrame = 0;
+        fitResultNameContent();
+    });
+}
+
+function fitResultNameContent() {
+    const element = dom.resultName;
+    if (!element || element.classList.contains("is-placeholder")) {
+        if (element) {
+            element.style.removeProperty("font-size");
+        }
+        return;
+    }
+    const height = element.clientHeight;
+    if (!height) {
+        return;
+    }
+    element.style.removeProperty("font-size");
+    const computed = window.getComputedStyle(element);
+    let size = parseFloat(computed.fontSize);
+    if (!Number.isFinite(size) || size <= 0) {
+        return;
+    }
+    const minSize = 16;
+    let steps = 0;
+    const limit = 48;
+    while (element.scrollHeight > element.clientHeight && steps < limit && size > minSize) {
+        size -= 1.5;
+        element.style.fontSize = `${size}px`;
+        steps += 1;
+    }
+}
+
+function applyResultName(value, kind) {
+    const element = dom.resultName;
+    if (!element) {
+        return;
+    }
+    element.classList.remove("is-placeholder", "is-text", "is-names");
+    element.innerHTML = "";
+    element.style.removeProperty("font-size");
+    if (kind === "names") {
+        const list = Array.isArray(value) ? value : [];
+        if (!list.length) {
+            element.classList.add("is-placeholder");
+            element.textContent = "--";
+            element.style.removeProperty("font-size");
+            return;
+        }
+        element.classList.add("is-names");
+        const fragment = document.createDocumentFragment();
+        for (const item of list) {
+            const span = document.createElement("span");
+            span.className = "result-name-item";
+            span.textContent = item;
+            fragment.appendChild(span);
+        }
+        element.appendChild(fragment);
+        scheduleResultNameFit();
+        return;
+    }
+    const text = typeof value === "string" ? value : String(value || "");
+    if (kind === "placeholder" || !text.trim() || text === "--") {
+        element.classList.add("is-placeholder");
+        element.textContent = "--";
+        element.style.removeProperty("font-size");
+        return;
+    }
+    element.classList.add("is-text");
+    element.textContent = text;
+    scheduleResultNameFit();
+}
+
+function setResultNamePlaceholder() {
+    applyResultName("--", "placeholder");
+}
+
+function setResultNameText(value) {
+    const text = value === undefined || value === null ? "" : String(value);
+    if (!text.trim() || text === "--") {
+        setResultNamePlaceholder();
+        return;
+    }
+    applyResultName(text, "text");
+}
+
+function setResultNameNames(values) {
+    const list = Array.isArray(values) ? values.map(item => String(item)).filter(item => item.trim() !== "") : [];
+    if (!list.length) {
+        setResultNamePlaceholder();
+        return;
+    }
+    applyResultName(list, "names");
+}
+
 const STORAGE_MODE = window.__APP_STORAGE_MODE__ || "filesystem";
 const USE_BROWSER_STORAGE = STORAGE_MODE === "browser";
 const STORAGE_KEY = "pickme::payload";
@@ -87,6 +189,8 @@ const timeShortFormatter = new Intl.DateTimeFormat("zh-CN", {
 });
 const WEEKDAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 const PICK_MODE_LABELS = { any: "抽取一人", batch: "抽取多人", group: "抽取小组" };
+
+window.addEventListener("resize", scheduleResultNameFit, { passive: true });
 
 init();
 
@@ -572,7 +676,7 @@ function renderCooldownItem(student) {
 
 function renderSelection() {
     if (!state.lastSelection) {
-        dom.resultName.textContent = "--";
+        setResultNamePlaceholder();
         dom.resultNote.textContent = "等待抽取";
         return;
     }
@@ -587,7 +691,7 @@ function renderSelection() {
             }
             const name = selection.name || "--";
             const groupValue = Number.isFinite(selection.group) ? selection.group : null;
-            dom.resultName.textContent = name;
+            setResultNameText(name);
             dom.resultNote.textContent = groupValue !== null ? `来自第 ${groupValue} 组` : "抽取一人";
             break;
         }
@@ -605,7 +709,7 @@ function renderSelection() {
             } else {
                 selection.names = names.slice();
             }
-            dom.resultName.textContent = names.length ? names.join("、") : "--";
+            setResultNameNames(names);
             const count = ids.length || names.length;
             dom.resultNote.textContent = count ? `抽取多人 · 共 ${count} 人` : "抽取多人";
             break;
@@ -627,8 +731,14 @@ function renderSelection() {
                 selection.names = names.slice();
             }
             selection.group = groupValue;
-            dom.resultName.textContent = groupValue !== null ? `第 ${groupValue} 组` : "小组抽取";
-            dom.resultNote.textContent = names.length ? names.join("、") : "成员已加入冷却";
+            setResultNameNames(names);
+            if (names.length) {
+                dom.resultNote.textContent = groupValue !== null ? `第 ${groupValue} 组` : "小组抽取";
+            } else if (groupValue !== null) {
+                dom.resultNote.textContent = `第 ${groupValue} 组 · 成员已加入冷却`;
+            } else {
+                dom.resultNote.textContent = "小组抽取";
+            }
             break;
         }
     }
@@ -2393,12 +2503,12 @@ function runSelectionAnimation(result) {
     if (type === "group") {
         showFrame = value => {
             const numeric = Number(value);
-            dom.resultName.textContent = Number.isFinite(numeric) ? `第 ${numeric} 组` : "--";
+            setResultNameText(Number.isFinite(numeric) ? `第 ${numeric} 组` : "--");
         };
     } else {
         showFrame = id => {
             const student = state.studentsMap.get(id);
-            dom.resultName.textContent = student ? student.name : "--";
+            setResultNameText(student ? student.name : "--");
         };
     }
     const finishDelay = 140;
