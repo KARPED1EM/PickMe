@@ -601,7 +601,7 @@ function renderStudentItem(student) {
       </div>
       <div class="student-meta">
         <span>共 ${student.pick_count} 次</span>
-        <span class="student-cooldown">${escapeHtml(remaining)}</span>
+        ${student.is_cooling ? `<span class="student-cooldown">${escapeHtml(remaining)}</span>` : ''}
       </div>
     </div>
   </li>`;
@@ -3017,18 +3017,36 @@ function normalizeHistoryStudent(student) {
 
 function normalizeStudent(student) {
     const history = Array.isArray(student.pick_history) ? student.pick_history.map(value => Number(value)).filter(value => Number.isFinite(value)) : [];
-    const remaining = Number(student.remaining_cooldown);
-    const lastPick = Number(student.last_pick);
-    const pickCount = Number(student.pick_count);
+    const nowSeconds = Date.now() / 1000;
+    const rawRemaining = Number(student.remaining_cooldown);
+    const rawLastPick = Number(student.last_pick);
+    const rawPickCount = Number(student.pick_count);
+    const rawCooldownStarted = Number(student.cooldown_started_at);
+    const rawCooldownExpires = Number(student.cooldown_expires_at);
+    const cooldownStarted = Number.isFinite(rawCooldownStarted) && rawCooldownStarted > 0 ? rawCooldownStarted : 0;
+    const cooldownExpires = Number.isFinite(rawCooldownExpires) && rawCooldownExpires > 0 ? rawCooldownExpires : 0;
+    let remaining = Number.isFinite(rawRemaining) ? rawRemaining : Number.isFinite(cooldownExpires) ? Math.max(0, cooldownExpires - nowSeconds) : 0;
+    if (!Number.isFinite(remaining)) {
+        remaining = 0;
+    }
+    remaining = Math.max(0, remaining);
+    const lastPick = Number.isFinite(rawLastPick) ? rawLastPick : 0;
+    const pickCount = Number.isFinite(rawPickCount) ? rawPickCount : history.length;
+    const isCooling =
+        student.is_cooling !== undefined
+            ? Boolean(student.is_cooling)
+            : remaining > 0 || cooldownExpires > nowSeconds;
     return {
         id: String(student.id || ""),
         name: String(student.name || ""),
         group: Number(student.group) || 0,
-        last_pick: Number.isFinite(lastPick) ? lastPick : 0,
-        remaining_cooldown: Number.isFinite(remaining) ? remaining : 0,
-        pick_count: Number.isFinite(pickCount) ? pickCount : history.length,
+        last_pick: lastPick,
+        remaining_cooldown: remaining,
+        cooldown_started_at: cooldownStarted,
+        cooldown_expires_at: cooldownExpires,
+        pick_count: pickCount,
         pick_history: history,
-        is_cooling: student.is_cooling !== undefined ? Boolean(student.is_cooling) : Number.isFinite(remaining) ? remaining > 0 : false
+        is_cooling: isCooling
     };
 }
 
