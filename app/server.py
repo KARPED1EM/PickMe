@@ -126,9 +126,7 @@ def create_app(
         state: ClassroomsState, data: dict[str, Any]
     ) -> JSONResponse:
         request = DrawRequest.from_payload(data)
-        outcome = draw_service.execute(
-            state, request, timestamp=current_timestamp()
-        )
+        outcome = draw_service.execute(state, request, timestamp=current_timestamp())
         return build_response(
             state,
             result=outcome.to_payload(),

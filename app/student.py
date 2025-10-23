@@ -208,9 +208,13 @@ class Student:
         cooldown_started_at = obj.get("cooldown_started_at", 0.0)
         cooldown_expires_at = obj.get("cooldown_expires_at", 0.0)
         cooldown_payload = obj.get("cooldown")
+        has_explicit_cooldown = False
         if isinstance(cooldown_payload, dict):
+            has_explicit_cooldown = True
             cooldown_started_at = cooldown_payload.get("started_at", cooldown_started_at)
             cooldown_expires_at = cooldown_payload.get("expires_at", cooldown_expires_at)
+        elif "cooldown_started_at" in obj or "cooldown_expires_at" in obj:
+            has_explicit_cooldown = True
         student = Student(
             student_id=obj.get("id"),
             name=name_value,
@@ -222,7 +226,8 @@ class Student:
             cooldown_expires_at=cooldown_expires_at,
         )
         if (
-            student.cooldown_expires_at == 0.0
+            not has_explicit_cooldown
+            and student.cooldown_expires_at == 0.0
             and student.last_pick > 0.0
             and default_cooldown_days is not None
             and default_cooldown_days > 0
