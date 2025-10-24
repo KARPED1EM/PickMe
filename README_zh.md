@@ -1,8 +1,8 @@
 # PickMe 点名助手
 
-[English](README.md) | [中文](#pickme-点名助手)
+[English](README.md) | 中文
 
-PickMe 是一款基于 FastAPI 与现代 Web 前端的随机点名工具，可在桌面端（WebView2 封装）或服务器模式下使用，帮助老师轻松开展课堂互动。
+PickMe 是一款基于 FastAPI 与现代 Web 前端的随机点名工具，可在桌面端（WebView2 封装）或服务器模式下使用。
 
 ## 功能特点
 - 🎯 **随机抽取**：支持单人 / 小组随机抽取，冷却时间可配置，避免频繁重复点名
@@ -72,7 +72,3 @@ app/                      # FastAPI 应用、模板与静态资源
 app/paths.py              # 运行时路径与用户数据目录定位
 app/metadata.py           # 应用元数据（版本：v2.0.0）
 ```
-
-## 许可证
-
-MIT License
