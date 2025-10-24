@@ -33,6 +33,10 @@ const dom = {
     resultControlsShell: document.querySelector('.result-controls-shell'),
 };
 
+const THRESHOLD_W = 1040;
+const THRESHOLD_H = 600;
+const WINDOW_SIZE_CHECK_DELAY = 320;
+
 const DRAW_MODES = Object.freeze({
     SINGLE: "single",
     BATCH: "batch",
@@ -326,6 +330,9 @@ const state = {
 const TOAST_DEFAULT_DURATION = 2400;
 const toastStates = new Map();
 let toastPauseDepth = 0;
+let windowSizeCheckTimer = 0;
+let windowSizeWarningLocked = false;
+let windowSizeWarningToast = null;
 let animationInterval = null;
 let animationTimeout = null;
 let renderFrameId = 0;
@@ -363,6 +370,7 @@ window.addEventListener("resize", () => {
     if (dom.resultName && dom.resultName.classList.contains("is-names")) {
         scheduleResultNameFit();
     }
+    scheduleWindowSizeCheck();
 }, { passive: true });
 
 init();
@@ -374,6 +382,7 @@ function init() {
     bindEvents();
     setupResultNameObserver();
     scheduleResultNameFit();
+    scheduleWindowSizeCheck(true);
     setPickMode(state.pickMode || DRAW_MODES.SINGLE, { silent: true, skipControls: true });
     requestRender({ immediate: true });
 }
@@ -3901,4 +3910,54 @@ function runSelectionAnimation(result) {
             }
         }, interval);
     });
+}
+
+function scheduleWindowSizeCheck(immediate = false) {
+    if (immediate) {
+        if (windowSizeCheckTimer) {
+            clearTimeout(windowSizeCheckTimer);
+            windowSizeCheckTimer = 0;
+        }
+        runWindowSizeCheck();
+        return;
+    }
+    if (windowSizeCheckTimer) {
+        clearTimeout(windowSizeCheckTimer);
+    }
+    windowSizeCheckTimer = setTimeout(() => {
+        windowSizeCheckTimer = 0;
+        runWindowSizeCheck();
+    }, WINDOW_SIZE_CHECK_DELAY);
+}
+
+function runWindowSizeCheck() {
+    const width = Math.max(window.innerWidth || 0, document.documentElement ? document.documentElement.clientWidth : 0);
+    const height = Math.max(window.innerHeight || 0, document.documentElement ? document.documentElement.clientHeight : 0);
+    const meetsThreshold = width >= THRESHOLD_W && height >= THRESHOLD_H;
+    if (meetsThreshold) {
+        if (windowSizeWarningToast) {
+            dismissToast(windowSizeWarningToast);
+            windowSizeWarningToast = null;
+        }
+        windowSizeWarningLocked = false;
+        return;
+    }
+    if (windowSizeWarningLocked) {
+        return;
+    }
+    windowSizeWarningLocked = true;
+    const toast = showToast("建议将窗口调至 1040×600 以上，以避免可能的显示异常~", { type: "warning", duration: 4800 });
+    if (toast) {
+        windowSizeWarningToast = toast;
+        const handleRemoval = (event) => {
+            if (event.target !== toast || !toast.classList.contains("is-leaving")) {
+                return;
+            }
+            if (windowSizeWarningToast === toast) {
+                windowSizeWarningToast = null;
+            }
+            toast.removeEventListener("animationend", handleRemoval);
+        };
+        toast.addEventListener("animationend", handleRemoval);
+    }
 }
