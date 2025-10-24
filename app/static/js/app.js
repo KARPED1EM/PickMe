@@ -33,6 +33,31 @@ const dom = {
     resultControlsShell: document.querySelector('.result-controls-shell'),
 };
 
+const DRAW_MODES = Object.freeze({
+    SINGLE: "single",
+    BATCH: "batch",
+    GROUP: "group",
+});
+
+const ACTIONS = Object.freeze({
+    CLASS_SWITCH: "class_switch",
+    CLASS_DELETE: "class_delete",
+    CLASS_CREATE: "class_create",
+    CLASS_REORDER: "class_reorder",
+    SET_COOLDOWN: "set_cooldown",
+    CLEAR_COOLDOWN: "clear_cooldown",
+    HISTORY_NOTE: "history_entry_note",
+    HISTORY_DELETE: "history_entry_delete",
+    STUDENT_HISTORY_CLEAR: "student_history_clear",
+    STUDENT_HISTORY_REMOVE: "student_history_remove",
+    STUDENT_CREATE: "student_create",
+    STUDENT_UPDATE: "student_update",
+    STUDENT_DELETE: "student_delete",
+    RANDOM_PICK: "random_pick",
+    STUDENT_FORCE_COOLDOWN: "student_force_cooldown",
+    STUDENT_RELEASE_COOLDOWN: "student_release_cooldown",
+});
+
 let resultNameFitFrame = 0;
 
 function scheduleResultNameFit() {
@@ -43,6 +68,30 @@ function scheduleResultNameFit() {
         resultNameFitFrame = 0;
         fitResultNameContent();
     });
+}
+
+function setupResultNameObserver() {
+    if (typeof ResizeObserver !== "function") {
+        return;
+    }
+    if (resultNameObserver) {
+        resultNameObserver.disconnect();
+    }
+    const element = dom.resultName;
+    if (!element) {
+        return;
+    }
+    const observer = new ResizeObserver(() => {
+        scheduleResultNameFit();
+    });
+    observer.observe(element);
+    if (element.parentElement) {
+        observer.observe(element.parentElement);
+    }
+    if (dom.resultCard) {
+        observer.observe(dom.resultCard);
+    }
+    resultNameObserver = observer;
 }
 
 function fitResultNameContent() {
@@ -61,17 +110,39 @@ function fitResultNameContent() {
     }
     element.style.removeProperty("font-size");
     const computed = window.getComputedStyle(element);
-    let size = parseFloat(computed.fontSize);
-    if (!Number.isFinite(size) || size <= 0) {
-        return;
+    let baseSize = parseFloat(computed.fontSize);
+    if (!Number.isFinite(baseSize) || baseSize <= 0) {
+        baseSize = 32;
     }
-    const minSize = 16;
-    let steps = 0;
-    const limit = 48;
-    while (element.scrollHeight > availableHeight && steps < limit && size > minSize) {
-        size -= 1.5;
+    const minSize = Math.min(baseSize, 16);
+    let low = minSize;
+    let high = Math.max(baseSize, minSize);
+    let best = minSize;
+    const fits = size => {
         element.style.fontSize = `${size}px`;
-        steps += 1;
+        return element.scrollHeight <= availableHeight;
+    };
+    if (fits(high)) {
+        best = high;
+    } else {
+        let iteration = 0;
+        const maxIterations = 8;
+        while (iteration < maxIterations && high - low > 0.5) {
+            const mid = (low + high) / 2;
+            if (fits(mid)) {
+                best = mid;
+                low = mid;
+            } else {
+                high = mid;
+            }
+            iteration += 1;
+        }
+    }
+    const finalSize = Math.max(minSize, Math.min(best, high));
+    if (Math.abs(finalSize - baseSize) < 0.5) {
+        element.style.removeProperty("font-size");
+    } else {
+        element.style.fontSize = `${finalSize}px`;
     }
 }
 
@@ -138,16 +209,16 @@ function setResultNameNames(values) {
 }
 
 const DRAW_MODE_ALIASES = {
-    single: "single",
-    any: "single",
-    student: "single",
-    batch: "batch",
-    group: "group",
+    [DRAW_MODES.SINGLE]: DRAW_MODES.SINGLE,
+    any: DRAW_MODES.SINGLE,
+    student: DRAW_MODES.SINGLE,
+    [DRAW_MODES.BATCH]: DRAW_MODES.BATCH,
+    [DRAW_MODES.GROUP]: DRAW_MODES.GROUP,
 };
 
 function normalizeDrawMode(value) {
     const key = typeof value === "string" ? value.trim().toLowerCase() : "";
-    return DRAW_MODE_ALIASES[key] || "single";
+    return DRAW_MODE_ALIASES[key] || DRAW_MODES.SINGLE;
 }
 
 function normalizeResultStudents(entries) {
@@ -228,7 +299,7 @@ const state = {
     contextTarget: null,
     historyStudentId: null,
     classDragSource: null,
-    pickMode: "single",
+    pickMode: DRAW_MODES.SINGLE,
     isModeMenuOpen: false
 };
 
@@ -237,6 +308,10 @@ const toastStates = new Map();
 let toastPauseDepth = 0;
 let animationInterval = null;
 let animationTimeout = null;
+let renderFrameId = 0;
+let renderQueued = false;
+let resultNameObserver = null;
+const pendingRequests = new Map();
 const modalStack = [];
 const timeFormatter = new Intl.DateTimeFormat("zh-CN", {
     year: "numeric",
@@ -258,7 +333,11 @@ const timeShortFormatter = new Intl.DateTimeFormat("zh-CN", {
     hour12: false
 });
 const WEEKDAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-const PICK_MODE_LABELS = { single: "抽取一人", batch: "抽取多人", group: "抽取小组" };
+const PICK_MODE_LABELS = {
+    [DRAW_MODES.SINGLE]: "抽取一人",
+    [DRAW_MODES.BATCH]: "抽取多人",
+    [DRAW_MODES.GROUP]: "抽取小组",
+};
 
 window.addEventListener("resize", scheduleResultNameFit, { passive: true });
 
@@ -269,8 +348,10 @@ function init() {
     const initialState = loadInitialState();
     applyAppState(initialState);
     bindEvents();
-    setPickMode(state.pickMode || "single", { silent: true, skipControls: true });
-    render();
+    setupResultNameObserver();
+    scheduleResultNameFit();
+    setPickMode(state.pickMode || DRAW_MODES.SINGLE, { silent: true, skipControls: true });
+    requestRender({ immediate: true });
 }
 
 function loadInitialState() {
@@ -459,7 +540,29 @@ function applyAppState(rawState) {
     updateClassModal();
 }
 
-function render() {
+function requestRender(options = {}) {
+    const immediate = !!(options && options.immediate);
+    if (immediate) {
+        if (renderFrameId) {
+            cancelAnimationFrame(renderFrameId);
+            renderFrameId = 0;
+        }
+        renderQueued = false;
+        performRender();
+        return;
+    }
+    if (renderQueued) {
+        return;
+    }
+    renderQueued = true;
+    renderFrameId = requestAnimationFrame(() => {
+        renderFrameId = 0;
+        renderQueued = false;
+        performRender();
+    });
+}
+
+function performRender() {
     renderStats();
     renderLists();
     renderHistory();
@@ -620,10 +723,11 @@ function renderStudentItem(student) {
 }
 
 function describeHistoryMode(entry) {
-    switch (entry && entry.mode) {
-        case "group":
+    const mode = normalizeDrawMode(entry && entry.mode);
+    switch (mode) {
+        case DRAW_MODES.GROUP:
             return "抽取小组";
-        case "batch":
+        case DRAW_MODES.BATCH:
             return "抽取多人";
         default:
             return "抽取一人";
@@ -645,10 +749,11 @@ function buildHistoryEntryMeta(entry) {
     const shortTime = timeShortFormatter.format(new Date(entry.timestamp * 1000));
     const relative = formatSince(entry.timestamp);
     meta.push(`<span class="history-entry-tag" title="${escapeHtml(absolute)}">${escapeHtml(relative)} · ${escapeHtml(shortTime)}</span>`);
-    if (entry.mode === "group" && Number.isFinite(entry.group)) {
+    const mode = normalizeDrawMode(entry && entry.mode);
+    if (mode === DRAW_MODES.GROUP && Number.isFinite(entry.group)) {
         meta.push(`<span class="history-entry-tag">第 ${escapeHtml(String(entry.group))} 组</span>`);
     }
-    if (entry.mode === "batch") {
+    if (mode === DRAW_MODES.BATCH) {
         const count = Number.isFinite(entry.count) && entry.count > 0 ? entry.count : entry.students.length;
         meta.push(`<span class="history-entry-tag">共 ${escapeHtml(String(count))} 人</span>`);
     }
@@ -754,67 +859,39 @@ function renderSelection() {
         return;
     }
     const selection = state.lastSelection;
-    switch (selection.type) {
-        case "single": {
-            const id = selection.ids[0];
-            const student = state.studentsMap.get(id);
-            if (student) {
-                selection.name = student.name;
-                selection.group = student.group;
-            }
-            const name = selection.name || "--";
-            const groupValue = Number.isFinite(selection.group) ? selection.group : null;
-            setResultNameText(name);
-            dom.resultNote.textContent = groupValue !== null ? `来自第 ${groupValue} 组` : "抽取一人";
-            break;
-        }
-        case "batch": {
-            const ids = Array.isArray(selection.ids) ? selection.ids : [];
-            const names = [];
-            for (const id of ids) {
-                const student = state.studentsMap.get(id);
-                if (student) {
-                    names.push(student.name);
-                }
-            }
-            if (!names.length && Array.isArray(selection.names)) {
-                names.push(...selection.names);
-            } else {
-                selection.names = names.slice();
-            }
-            setResultNameNames(names);
-            const count = ids.length || names.length;
-            dom.resultNote.textContent = count ? `抽取多人 · 共 ${count} 人` : "抽取多人";
-            break;
-        }
-        case "group":
-        default: {
-            const names = [];
-            let groupValue = Number.isFinite(selection.group) ? selection.group : null;
-            for (const id of selection.ids) {
-                const student = state.studentsMap.get(id);
-                if (student) {
-                    names.push(student.name);
-                    groupValue = student.group;
-                }
-            }
-            if (!names.length && Array.isArray(selection.names)) {
-                names.push(...selection.names);
-            } else {
-                selection.names = names.slice();
-            }
-            selection.group = groupValue;
-            setResultNameNames(names);
-            if (names.length) {
-                dom.resultNote.textContent = groupValue !== null ? `第 ${groupValue} 组` : "小组抽取";
-            } else if (groupValue !== null) {
-                dom.resultNote.textContent = `第 ${groupValue} 组 · 成员已加入冷却`;
-            } else {
-                dom.resultNote.textContent = "小组抽取";
-            }
-            break;
-        }
+    const students = resolveSelectionStudents(selection);
+    selection.students = students;
+    const mode = selection.mode || DRAW_MODES.SINGLE;
+    if (mode === DRAW_MODES.BATCH) {
+        const names = students.map(student => student.name).filter(Boolean);
+        setResultNameNames(names);
+        const count = selection.studentIds ? selection.studentIds.length : names.length;
+        dom.resultNote.textContent = count ? `抽取多人 · 共 ${count} 人` : "抽取多人";
+        return;
     }
+    if (mode === DRAW_MODES.GROUP) {
+        const names = students.map(student => student.name).filter(Boolean);
+        setResultNameNames(names);
+        const groupValue = toFiniteNumber(selection.group);
+        if (names.length) {
+            dom.resultNote.textContent = groupValue !== null ? `第 ${groupValue} 组` : "小组抽取";
+        } else if (groupValue !== null) {
+            dom.resultNote.textContent = `第 ${groupValue} 组 · 成员待载入`;
+        } else {
+            dom.resultNote.textContent = "小组抽取";
+        }
+        return;
+    }
+    const student = students[0];
+    if (student) {
+        setResultNameText(student.name || "--");
+        const groupValue = toFiniteNumber(student.group ?? selection.group);
+        dom.resultNote.textContent = groupValue !== null ? `来自第 ${groupValue} 组` : "抽取一人";
+        return;
+    }
+    setResultNamePlaceholder();
+    dom.resultNote.textContent = "抽取一人";
+    return;
 }
 
 function resetSelection() {
@@ -831,7 +908,7 @@ function updateControls() {
         dom.pickModeToggle.disabled = disabled;
     }
     if (dom.batchCount) {
-        dom.batchCount.disabled = disabled || state.pickMode !== "batch";
+        dom.batchCount.disabled = disabled || state.pickMode !== DRAW_MODES.BATCH;
     }
     dom.clearCooldown.disabled = disabled;
     dom.addStudent.disabled = disabled;
@@ -1164,12 +1241,15 @@ async function handleClassSwitchRequest(classId) {
     }
     setBusy(true);
     try {
-        const response = await sendAction("class_switch", { class_id: classId });
+        const response = await sendAction(ACTIONS.CLASS_SWITCH, { class_id: classId });
         applyAppState(response.state);
-        render();
+        requestRender();
         closeModal();
         showToast(`已切换至 ${state.currentClassName}`, "success");
     } catch (error) {
+        if (isAbortError(error)) {
+            return;
+        }
         showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
@@ -1198,11 +1278,14 @@ async function handleClassDeleteRequest(classId) {
     }
     setBusy(true);
     try {
-        const response = await sendAction("class_delete", { class_id: classId });
+        const response = await sendAction(ACTIONS.CLASS_DELETE, { class_id: classId });
         applyAppState(response.state);
-        render();
+        requestRender();
         showToast("班级已删除", "success");
     } catch (error) {
+        if (isAbortError(error)) {
+            return;
+        }
         showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
@@ -1293,12 +1376,15 @@ async function handleClassAddSubmit(event) {
     }
     setBusy(true);
     try {
-        const response = await sendAction("class_create", { name });
+        const response = await sendAction(ACTIONS.CLASS_CREATE, { name });
         applyAppState(response.state);
-        render();
+        requestRender();
         showToast("班级已添加", "success");
         closeModal();
     } catch (error) {
+        if (isAbortError(error)) {
+            return;
+        }
         showToast(error.message || "添加失败", error.status || "error");
     } finally {
         if (!state.isAnimating) setBusy(false);
@@ -1311,11 +1397,14 @@ async function submitClassReorder(order) {
     }
     setBusy(true);
     try {
-        const response = await sendAction("class_reorder", { order });
+        const response = await sendAction(ACTIONS.CLASS_REORDER, { order });
         applyAppState(response.state);
-        render();
+        requestRender();
         showToast("班级排序已更新", "success");
     } catch (error) {
+        if (isAbortError(error)) {
+            return;
+        }
         showToast(error.message, error.status);
         updateClassModal();
     } finally {
@@ -1357,12 +1446,15 @@ async function handleCooldownSave(value) {
     }
     setBusy(true);
     try {
-        const response = await sendAction("set_cooldown", { days: target });
+        const response = await sendAction(ACTIONS.SET_COOLDOWN, { days: target });
         applyAppState(response.state);
-        render();
+        requestRender();
         showToast("冷却时间已更新", "success");
         closeModal();
     } catch (error) {
+        if (isAbortError(error)) {
+            return;
+        }
         showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
@@ -1387,11 +1479,14 @@ async function handleClearCooldown() {
     }
     setBusy(true);
     try {
-        const response = await sendAction("clear_cooldown");
+        const response = await sendAction(ACTIONS.CLEAR_COOLDOWN);
         applyAppState(response.state);
-        render();
+        requestRender();
         showToast("冷却列表已清空", "success");
     } catch (error) {
+        if (isAbortError(error)) {
+            return;
+        }
         showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
@@ -1509,11 +1604,11 @@ function handleContextSelection(event) {
             return;
         }
         if (action === "force") {
-            runSimpleAction("student_force_cooldown", { student_id: id }, "已标记冷却");
+            runSimpleAction(ACTIONS.STUDENT_FORCE_COOLDOWN, { student_id: id }, "已标记冷却");
             return;
         }
         if (action === "release") {
-            runSimpleAction("student_release_cooldown", { student_id: id }, "已解除冷却");
+            runSimpleAction(ACTIONS.STUDENT_RELEASE_COOLDOWN, { student_id: id }, "已解除冷却");
         }
         return;
     }
@@ -1557,11 +1652,14 @@ async function runSimpleAction(action, payload, message) {
     try {
         const response = await sendAction(action, payload);
         applyAppState(response.state);
-        render();
+        requestRender();
         if (message) {
             showToast(message, "success");
         }
     } catch (error) {
+        if (isAbortError(error)) {
+            return;
+        }
         showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
@@ -1718,13 +1816,16 @@ async function submitHistoryNote(entryId, note) {
     }
     setBusy(true);
     try {
-        const response = await sendAction("history_entry_note", { entry_id: entryId, note });
+        const response = await sendAction(ACTIONS.HISTORY_NOTE, { entry_id: entryId, note });
         applyAppState(response.state);
         state.historyHighlightId = entryId;
-        render();
+        requestRender();
         closeModal();
         showToast("备注已保存", "success");
     } catch (error) {
+        if (isAbortError(error)) {
+            return;
+        }
         showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
@@ -1747,11 +1848,14 @@ async function handleHistoryDelete(entry) {
     }
     setBusy(true);
     try {
-        const response = await sendAction("history_entry_delete", { entry_id: entry.id });
+        const response = await sendAction(ACTIONS.HISTORY_DELETE, { entry_id: entry.id });
         applyAppState(response.state);
-        render();
+        requestRender();
         showToast("已删除历史记录", "success");
     } catch (error) {
+        if (isAbortError(error)) {
+            return;
+        }
         showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
@@ -1766,15 +1870,15 @@ function handlePickAction() {
     }
     closeContextMenu();
     closeModeMenu();
-    if (state.pickMode === 'batch') {
+    if (state.pickMode === DRAW_MODES.BATCH) {
         handleBatchPick();
         return;
     }
-    if (state.pickMode === 'group') {
-        handleRandom('group');
+    if (state.pickMode === DRAW_MODES.GROUP) {
+        handleRandom(DRAW_MODES.GROUP);
         return;
     }
-    handleRandom('single');
+    handleRandom(DRAW_MODES.SINGLE);
 }
 
 function handleBatchPick() {
@@ -1786,7 +1890,7 @@ function handleBatchPick() {
     }
     if (!dom.batchCount) {
         const fallback = getSuggestedBatchCount(available);
-        handleRandom('batch', { count: fallback });
+        handleRandom(DRAW_MODES.BATCH, { count: fallback });
         return;
     }
     const raw = Number(dom.batchCount.value);
@@ -1805,7 +1909,7 @@ function handleBatchPick() {
         return;
     }
     dom.batchCount.value = String(count);
-    handleRandom('batch', { count });
+    handleRandom(DRAW_MODES.BATCH, { count });
 }
 
 function handleModeToggle(event) {
@@ -1849,27 +1953,9 @@ function openModeMenu() {
 }
 
 function closeModeMenu() {
-    if (!dom.resultModeMenu) {
-        state.isModeMenuOpen = false;
-        if (dom.pickModeToggle) {
-            dom.pickModeToggle.setAttribute('aria-expanded', 'false');
-        }
-        if (dom.resultModeControl) {
-            dom.resultModeControl.classList.remove('is-open');
-        }
-        return;
+    if (dom.resultModeMenu) {
+        dom.resultModeMenu.hidden = true;
     }
-    if (dom.resultModeMenu.hidden) {
-        state.isModeMenuOpen = false;
-        if (dom.pickModeToggle) {
-            dom.pickModeToggle.setAttribute('aria-expanded', 'false');
-        }
-        if (dom.resultModeControl) {
-            dom.resultModeControl.classList.remove('is-open');
-        }
-        return;
-    }
-    dom.resultModeMenu.hidden = true;
     state.isModeMenuOpen = false;
     if (dom.pickModeToggle) {
         dom.pickModeToggle.setAttribute('aria-expanded', 'false');
@@ -1890,7 +1976,7 @@ function setPickMode(mode, options = {}) {
     if (!options.silent) {
         closeModeMenu();
     }
-    if (changed && normalized === 'batch' && dom.batchCount && !options.silent) {
+    if (changed && normalized === DRAW_MODES.BATCH && dom.batchCount && !options.silent) {
         dom.batchCount.focus();
         dom.batchCount.select();
     }
@@ -1898,11 +1984,11 @@ function setPickMode(mode, options = {}) {
 
 function syncPickModeUI() {
     if (dom.resultModeDisplay) {
-        const label = PICK_MODE_LABELS[state.pickMode] || PICK_MODE_LABELS.single;
+        const label = PICK_MODE_LABELS[state.pickMode] || PICK_MODE_LABELS[DRAW_MODES.SINGLE];
         dom.resultModeDisplay.textContent = label;
     }
     if (dom.batchField) {
-        dom.batchField.classList.toggle('d-none', state.pickMode !== 'batch');
+        dom.batchField.classList.toggle('d-none', state.pickMode !== DRAW_MODES.BATCH);
     }
     if (dom.resultModeMenu) {
         const options = dom.resultModeMenu.querySelectorAll('.result-mode-option');
@@ -1919,7 +2005,7 @@ function syncPickModeUI() {
     }
     syncBatchInput();
     if (dom.resultControlsShell) {
-    dom.resultControlsShell.classList.toggle('has-batch', state.pickMode === 'batch');
+    dom.resultControlsShell.classList.toggle('has-batch', state.pickMode === DRAW_MODES.BATCH);
     }
 }
 
@@ -1929,7 +2015,7 @@ function syncBatchInput() {
     }
     const available = getAvailableStudentCount();
     dom.batchCount.setAttribute('max', Math.max(available, 1).toString());
-    if (state.pickMode !== 'batch') {
+    if (state.pickMode !== DRAW_MODES.BATCH) {
         return;
     }
     if (!available) {
@@ -1984,11 +2070,12 @@ function getSuggestedBatchCount(available) {
         return 0;
     }
     let last = 3;
-    if (state.lastSelection && state.lastSelection.type === 'batch') {
-        if (Array.isArray(state.lastSelection.ids)) {
-            last = state.lastSelection.ids.length;
-        } else if (Number.isFinite(state.lastSelection.count)) {
-            last = Number(state.lastSelection.count);
+    if (state.lastSelection && state.lastSelection.mode === DRAW_MODES.BATCH) {
+        const idsLength = Array.isArray(state.lastSelection.studentIds) ? state.lastSelection.studentIds.length : 0;
+        if (idsLength) {
+            last = idsLength;
+        } else if (Number.isFinite(state.lastSelection.requestedCount)) {
+            last = Number(state.lastSelection.requestedCount);
         }
     }
     const fallback = Number.isFinite(last) && last > 0 ? Math.floor(last) : 2;
@@ -2238,11 +2325,14 @@ async function handleHistoryClear(studentId) {
     if (!confirmed) return;
     setBusy(true);
     try {
-        const response = await sendAction("student_history_clear", { student_id: studentId });
+        const response = await sendAction(ACTIONS.STUDENT_HISTORY_CLEAR, { student_id: studentId });
         applyAppState(response.state);
-        render();
+        requestRender();
         showToast("已清空历史记录", "success");
     } catch (error) {
+        if (isAbortError(error)) {
+            return;
+        }
         showToast(error.message, error.status);
     } finally {
         setBusy(false);
@@ -2255,11 +2345,14 @@ async function handleHistoryRemove(studentId, timestamp) {
     }
     setBusy(true);
     try {
-        const response = await sendAction("student_history_remove", { student_id: studentId, timestamp });
+        const response = await sendAction(ACTIONS.STUDENT_HISTORY_REMOVE, { student_id: studentId, timestamp });
         applyAppState(response.state);
-        render();
+        requestRender();
         showToast("已删除记录", "success");
     } catch (error) {
+        if (isAbortError(error)) {
+            return;
+        }
         showToast(error.message, error.status);
     } finally {
         setBusy(false);
@@ -2561,12 +2654,15 @@ async function handleStudentFormSubmit(mode, context) {
 async function submitStudentCreate(payload) {
     setBusy(true);
     try {
-        const response = await sendAction("student_create", payload);
+        const response = await sendAction(ACTIONS.STUDENT_CREATE, payload);
         applyAppState(response.state);
-        render();
+        requestRender();
         showToast("已添加学生", "success");
         closeModal();
     } catch (error) {
+        if (isAbortError(error)) {
+            return;
+        }
         showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
@@ -2578,12 +2674,15 @@ async function submitStudentCreate(payload) {
 async function submitStudentUpdate(payload) {
     setBusy(true);
     try {
-        const response = await sendAction("student_update", payload);
+        const response = await sendAction(ACTIONS.STUDENT_UPDATE, payload);
         applyAppState(response.state);
-        render();
+        requestRender();
         showToast("已保存修改", "success");
         closeModal();
     } catch (error) {
+        if (isAbortError(error)) {
+            return;
+        }
         showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
@@ -2598,12 +2697,15 @@ async function handleStudentDelete(student) {
     }
     setBusy(true);
     try {
-        const response = await sendAction("student_delete", { student_id: student.id });
+        const response = await sendAction(ACTIONS.STUDENT_DELETE, { student_id: student.id });
         applyAppState(response.state);
-        render();
+        requestRender();
         showToast("已删除学生", "success");
         closeModal();
     } catch (error) {
+        if (isAbortError(error)) {
+            return;
+        }
         showToast(error.message, error.status);
     } finally {
         if (!state.isAnimating) {
@@ -2620,7 +2722,7 @@ async function handleRandom(mode, extra = {}) {
     const normalizedMode = normalizeDrawMode(mode);
     setBusy(true);
     try {
-        const response = await sendAction("random_pick", {
+        const response = await sendAction(ACTIONS.RANDOM_PICK, {
             mode: normalizedMode,
             ignore_cooldown: state.ignoreCooldown,
             ...extra,
@@ -2632,8 +2734,11 @@ async function handleRandom(mode, extra = {}) {
         if (historyEntryId) {
             state.historyHighlightId = historyEntryId;
         }
-        render();
+        requestRender();
     } catch (error) {
+        if (isAbortError(error)) {
+            return;
+        }
         showToast(error.message, error.status);
         resetSelection();
     } finally {
@@ -2641,156 +2746,6 @@ async function handleRandom(mode, extra = {}) {
             setBusy(false);
         }
     }
-}
-
-function runSelectionAnimation(result) {
-    if (animationInterval) {
-        clearInterval(animationInterval);
-        animationInterval = null;
-    }
-    if (animationTimeout) {
-        clearTimeout(animationTimeout);
-        animationTimeout = null;
-    }
-    if (!result) {
-        resetSelection();
-        return Promise.resolve();
-    }
-    const mode = normalizeDrawMode(result.mode || result.type);
-    const snapshotStudents = normalizeResultStudents(result.students);
-    let finalIds = snapshotStudents.map(student => student.id);
-    if (!finalIds.length) {
-        if (Array.isArray(result.student_ids)) {
-            finalIds = normalizeIdList(result.student_ids);
-        } else if (result.student_id) {
-            finalIds = normalizeIdList([result.student_id]);
-        }
-    }
-    if (!finalIds.length) {
-        resetSelection();
-        return Promise.resolve();
-    }
-    const poolStudents = [];
-    if (result.pool && typeof result.pool === "object") {
-        poolStudents.push(...normalizeIdList(result.pool.students));
-    }
-    if (!poolStudents.length && Array.isArray(result.pool_ids)) {
-        poolStudents.push(...normalizeIdList(result.pool_ids));
-    }
-    if (!poolStudents.length && Array.isArray(result.student_ids)) {
-        poolStudents.push(...normalizeIdList(result.student_ids));
-    }
-    const poolGroups = [];
-    if (result.pool && typeof result.pool === "object" && Array.isArray(result.pool.groups)) {
-        for (const value of result.pool.groups) {
-            const number = toFiniteNumber(value);
-            if (number !== null) {
-                poolGroups.push(number);
-            }
-        }
-    }
-    const finalGroup = mode === "group"
-        ? (() => {
-            const direct = toFiniteNumber(result.group);
-            if (direct !== null) {
-                return direct;
-            }
-            for (const item of snapshotStudents) {
-                const groupValue = toFiniteNumber(item.group);
-                if (groupValue !== null) {
-                    return groupValue;
-                }
-            }
-            return toFiniteNumber(inferGroupFromIds(finalIds));
-        })()
-        : null;
-    const frames = mode === "group"
-        ? buildGroupAnimationSequence(poolGroups.length ? poolGroups : getGroupPool(), finalGroup)
-        : buildAnimationSequence(poolStudents.length ? poolStudents : finalIds, finalIds);
-    state.isAnimating = true;
-    updateControls();
-    dom.resultCard.classList.add("is-animating");
-    dom.resultNote.textContent = "正在抽取...";
-    let index = 0;
-    let showFrame;
-    if (mode === "group") {
-        showFrame = value => {
-            const numeric = Number(value);
-            setResultNameText(Number.isFinite(numeric) ? `第 ${numeric} 组` : "--");
-        };
-    } else {
-        showFrame = id => {
-            const student = state.studentsMap.get(id);
-            setResultNameText(student ? student.name : "--");
-        };
-    }
-    const finishDelay = 140;
-    const interval = 95;
-    return new Promise(resolve => {
-        const finish = () => {
-            finalizeSelection(type, finalIds, result);
-            dom.resultCard.classList.remove("is-animating");
-            state.isAnimating = false;
-            updateControls();
-            renderSelection();
-            resolve();
-        };
-        if (!frames.length) {
-            finish();
-            return;
-        }
-        showFrame(frames[0]);
-        index = 1;
-        if (frames.length === 1) {
-            animationTimeout = setTimeout(() => {
-                animationTimeout = null;
-                finish();
-            }, finishDelay);
-            return;
-        }
-        animationInterval = setInterval(() => {
-            showFrame(frames[index]);
-            index += 1;
-            if (index >= frames.length) {
-                clearInterval(animationInterval);
-                animationInterval = null;
-                animationTimeout = setTimeout(() => {
-                    animationTimeout = null;
-                    finish();
-                }, finishDelay);
-            }
-        }, interval);
-    });
-}
-
-function finalizeSelection(type, finalIds, result) {
-    if (type === "group") {
-        const names = [];
-        let groupValue = Number.isFinite(result.group) ? result.group : null;
-        for (const id of finalIds) {
-            const student = state.studentsMap.get(id);
-            if (student) {
-                names.push(student.name);
-                groupValue = student.group;
-            }
-        }
-        state.lastSelection = { type: "group", ids: finalIds, group: groupValue, names };
-        return;
-    }
-    if (type === "batch") {
-        const names = [];
-        for (const id of finalIds) {
-            const student = state.studentsMap.get(id);
-            if (student) {
-                names.push(student.name);
-            }
-        }
-        state.lastSelection = { type: "batch", ids: finalIds, names, count: finalIds.length };
-        return;
-    }
-    const id = finalIds[0];
-    const student = state.studentsMap.get(id);
-    state.lastSelection = { type: "single", ids: finalIds, name: student ? student.name : "", group: student ? student.group : null };
 }
 
 function buildAnimationSequence(pool, finalIds) {
@@ -2938,14 +2893,14 @@ async function handleSettingsImportSelect(event) {
         const validated = validateImportPayload(payload);
         if (USE_BROWSER_STORAGE) {
             applyAppState(validated);
-            render();
+            requestRender({ immediate: true });
             showToast("\u5bfc\u5165\u6210\u529f", "success");
             closeModal();
         } else {
             setBusy(true);
             busyManaged = true;
             await submitImportPayload(validated);
-            render();
+            requestRender({ immediate: true });
             showToast("\u5bfc\u5165\u6210\u529f", "success");
             closeModal();
         }
@@ -3130,39 +3085,20 @@ function syncSelection() {
         return;
     }
     const selection = state.lastSelection;
-    if (selection.type === "single") {
-        const id = selection.ids[0];
-        if (!state.studentsMap.has(id)) {
-            return;
-        }
-        const student = state.studentsMap.get(id);
-        selection.name = student.name;
-        selection.group = student.group;
-        return;
-    }
-    if (selection.type === "batch") {
-        const names = [];
-        for (const id of selection.ids) {
-            const student = state.studentsMap.get(id);
-            if (student) {
-                names.push(student.name);
+    const students = resolveSelectionStudents(selection);
+    selection.students = students;
+    if (selection.mode === DRAW_MODES.SINGLE && students.length) {
+        selection.group = toFiniteNumber(students[0].group);
+    } else if (selection.mode === DRAW_MODES.GROUP) {
+        const withGroup = students.find(item => toFiniteNumber(item.group) !== null);
+        if (withGroup) {
+            selection.group = toFiniteNumber(withGroup.group);
+        } else {
+            selection.group = toFiniteNumber(selection.group);
+            if (selection.group === null) {
+                selection.group = toFiniteNumber(inferGroupFromIds(selection.studentIds || []));
             }
         }
-        selection.names = names;
-        return;
-    }
-    if (selection.type === "group") {
-        const names = [];
-        let groupValue = Number.isFinite(selection.group) ? selection.group : null;
-        for (const id of selection.ids) {
-            const student = state.studentsMap.get(id);
-            if (student) {
-                names.push(student.name);
-                groupValue = student.group;
-            }
-        }
-        selection.names = names;
-        selection.group = groupValue;
     }
 }
 
@@ -3186,20 +3122,54 @@ function getSortedStudents(students) {
     return list;
 }
 
-async function sendAction(action, data) {
-    const payload = { action, ...data };
+async function sendAction(action, data, options = {}) {
+    const payload = { action, ...(data || {}) };
     if (USE_BROWSER_STORAGE) {
         payload.payload = state.app;
+    }
+    const { cancelPrevious = true, signal } = options;
+    const controller = new AbortController();
+    let abortExternal;
+    if (cancelPrevious) {
+        const previous = pendingRequests.get(action);
+        if (previous && previous.controller) {
+            previous.controller.abort();
+        }
+        pendingRequests.set(action, { controller });
+    }
+    if (signal && typeof signal === "object") {
+        if (signal.aborted) {
+            controller.abort();
+        } else if (typeof signal.addEventListener === "function") {
+            abortExternal = () => controller.abort();
+            signal.addEventListener("abort", abortExternal, { once: true });
+        }
     }
     let response;
     try {
         response = await fetch("/actions", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
+            signal: controller.signal
         });
-    } catch {
+    } catch (error) {
+        if (controller.signal.aborted || (error && error.name === "AbortError")) {
+            const abortError = new Error("操作已取消");
+            abortError.name = "AbortError";
+            throw abortError;
+        }
         throw new Error("网络请求失败");
+    } finally {
+        if (cancelPrevious) {
+            const current = pendingRequests.get(action);
+            if (current && current.controller === controller) {
+                pendingRequests.delete(action);
+            }
+        }
+        if (signal && abortExternal && typeof signal.removeEventListener === "function") {
+            signal.removeEventListener("abort", abortExternal);
+        }
     }
     let result = {};
     try {
@@ -3213,6 +3183,10 @@ async function sendAction(action, data) {
         throw error;
     }
     return result;
+}
+
+function isAbortError(error) {
+    return !!(error && error.name === "AbortError");
 }
 
 function normalizeAppState(raw) {
@@ -3320,7 +3294,7 @@ function normalizeHistoryEntry(entry) {
     if (!id || !Number.isFinite(timestamp) || timestamp <= 0) {
         return null;
     }
-    const mode = typeof entry.mode === "string" ? entry.mode.toLowerCase() : "single";
+    const mode = normalizeDrawMode(entry && entry.mode);
     const students = Array.isArray(entry.students) ? entry.students.map(normalizeHistoryStudent).filter(student => student !== null) : [];
     let group = Number(entry.group);
     if (!Number.isFinite(group)) {
@@ -3742,7 +3716,7 @@ function finalizeSelection(mode, finalIds, result, snapshots) {
         students.push(...snapshotMap.values());
     }
     let groupValue = null;
-    if (normalizedMode === "group") {
+    if (normalizedMode === DRAW_MODES.GROUP) {
         const direct = toFiniteNumber(result && result.group);
         if (direct !== null) {
             groupValue = direct;
@@ -3833,7 +3807,7 @@ function runSelectionAnimation(result) {
             }
         }
     }
-    const finalGroup = mode === "group"
+    const finalGroup = mode === DRAW_MODES.GROUP
         ? (() => {
             const direct = toFiniteNumber(result.group);
             if (direct !== null) {
@@ -3848,7 +3822,7 @@ function runSelectionAnimation(result) {
             return toFiniteNumber(inferGroupFromIds(finalIds));
         })()
         : null;
-    const frames = mode === "group"
+    const frames = mode === DRAW_MODES.GROUP
         ? buildGroupAnimationSequence(poolGroups.length ? poolGroups : getGroupPool(), finalGroup)
         : buildAnimationSequence(poolStudents.length ? poolStudents : finalIds, finalIds);
     const snapshotMap = new Map(snapshotStudents.map(student => [student.id, student]));
@@ -3859,7 +3833,7 @@ function runSelectionAnimation(result) {
     let index = 0;
     const finishDelay = 140;
     const interval = 95;
-    const showFrame = mode === "group"
+    const showFrame = mode === DRAW_MODES.GROUP
         ? value => {
             const numeric = Number(value);
             setResultNameText(Number.isFinite(numeric) ? `第 ${numeric} 组` : "--");
@@ -3903,84 +3877,4 @@ function runSelectionAnimation(result) {
             }
         }, interval);
     });
-}
-
-function renderSelection() {
-    if (!state.lastSelection) {
-        setResultNamePlaceholder();
-        dom.resultNote.textContent = "等待抽取";
-        return;
-    }
-    const selection = state.lastSelection;
-    const students = resolveSelectionStudents(selection);
-    selection.students = students;
-    const mode = selection.mode || "single";
-    if (mode === "batch") {
-        const names = students.map(student => student.name).filter(Boolean);
-        setResultNameNames(names);
-        const count = selection.studentIds ? selection.studentIds.length : names.length;
-        dom.resultNote.textContent = count ? `抽取多人 · 共 ${count} 人` : "抽取多人";
-        return;
-    }
-    if (mode === "group") {
-        const names = students.map(student => student.name).filter(Boolean);
-        setResultNameNames(names);
-        const groupValue = toFiniteNumber(selection.group);
-        if (names.length) {
-            dom.resultNote.textContent = groupValue !== null ? `第 ${groupValue} 组` : "小组抽取";
-        } else if (groupValue !== null) {
-            dom.resultNote.textContent = `第 ${groupValue} 组 · 成员已冷却`;
-        } else {
-            dom.resultNote.textContent = "小组抽取";
-        }
-        return;
-    }
-    const student = students[0];
-    if (student) {
-        setResultNameText(student.name || "--");
-        const groupValue = toFiniteNumber(student.group ?? selection.group);
-        dom.resultNote.textContent = groupValue !== null ? `来自第 ${groupValue} 组` : "抽取一人";
-    } else {
-        setResultNamePlaceholder();
-        dom.resultNote.textContent = "抽取一人";
-    }
-}
-
-function syncSelection() {
-    if (!state.lastSelection) {
-        return;
-    }
-    const selection = state.lastSelection;
-    const students = resolveSelectionStudents(selection);
-    selection.students = students;
-    if (selection.mode === "single" && students.length) {
-        selection.group = toFiniteNumber(students[0].group);
-    } else if (selection.mode === "group") {
-        const withGroup = students.find(item => toFiniteNumber(item.group) !== null);
-        if (withGroup) {
-            selection.group = toFiniteNumber(withGroup.group);
-        } else {
-            selection.group = toFiniteNumber(selection.group);
-            if (selection.group === null) {
-                selection.group = toFiniteNumber(inferGroupFromIds(selection.studentIds || []));
-            }
-        }
-    }
-}
-
-function getSuggestedBatchCount(available) {
-    if (!available) {
-        return 0;
-    }
-    let last = 3;
-    if (state.lastSelection && state.lastSelection.mode === "batch") {
-        const idsLength = Array.isArray(state.lastSelection.studentIds) ? state.lastSelection.studentIds.length : 0;
-        if (idsLength) {
-            last = idsLength;
-        } else if (Number.isFinite(state.lastSelection.requestedCount)) {
-            last = Number(state.lastSelection.requestedCount);
-        }
-    }
-    const fallback = Number.isFinite(last) && last > 0 ? Math.floor(last) : 2;
-    return Math.min(available, Math.max(1, fallback));
 }
