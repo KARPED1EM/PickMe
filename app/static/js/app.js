@@ -61,11 +61,13 @@ const ACTIONS = Object.freeze({
 let resultNameFitFrame = 0;
 
 function scheduleResultNameFit(opts = {}) {
+    const element = dom.resultName;
+    if (!element || !element.classList.contains("is-names")) return;
     const { immediate = false } = opts;
     if (immediate) {
         if (resultNameFitFrame) {
-        cancelAnimationFrame(resultNameFitFrame);
-        resultNameFitFrame = 0;
+            cancelAnimationFrame(resultNameFitFrame);
+            resultNameFitFrame = 0;
         }
         fitResultNameContent();
         return;
@@ -80,20 +82,33 @@ function scheduleResultNameFit(opts = {}) {
 function setupResultNameObserver() {
     if (typeof ResizeObserver !== "function") return;
     if (resultNameObserver) resultNameObserver.disconnect();
+    const observer = new ResizeObserver(() => {
+        if (dom.resultName && dom.resultName.classList.contains("is-names")) {
+            scheduleResultNameFit();
+        }
+    });
+    resultNameObserver = observer;
+    updateResultNameObservation();
+}
+
+function updateResultNameObservation() {
+    if (!resultNameObserver) return;
+    resultNameObserver.disconnect();
     const element = dom.resultName;
     if (!element) return;
-    const observer = new ResizeObserver(() => {
-        scheduleResultNameFit();
-    });
-    observer.observe(element);
-    if (element.parentElement) observer.observe(element.parentElement);
-    if (dom.resultCard) observer.observe(dom.resultCard);
-    resultNameObserver = observer;
+    if (element.classList.contains("is-names")) {
+        resultNameObserver.observe(element);
+        if (element.parentElement) resultNameObserver.observe(element.parentElement);
+        if (dom.resultCard) resultNameObserver.observe(dom.resultCard);
+    }
 }
 
 function fitResultNameContent() {
     const element = dom.resultName;
     if (!element) {
+        return;
+    }
+    if (!element.classList.contains("is-names")) {
         return;
     }
     if (element.classList.contains("is-placeholder")) {
@@ -149,36 +164,46 @@ function applyResultName(value, kind) {
     element.classList.remove("is-placeholder", "is-text", "is-names");
     element.innerHTML = "";
     element.style.removeProperty("font-size");
-    if (kind === "names") {
-        const list = Array.isArray(value) ? value : [];
-        if (!list.length) {
+    const setPlaceholder = () => {
         element.classList.add("is-placeholder");
         element.textContent = "--";
-        element.style.removeProperty("font-size");
-        return;
+        updateResultNameObservation();
+    };
+    const setText = (text) => {
+        element.classList.add("is-text");
+        element.textContent = text;
+        updateResultNameObservation();
+    };
+    const toStr = (v) => (typeof v === "string" ? v : String(v ?? "")).trim();
+    if (kind === "names") {
+        const list = Array.isArray(value) ? value : [];
+        if (list.length === 0) {
+            setPlaceholder();
+            return;
+        }
+        if (list.length === 1) {
+            setText(toStr(list[0]));
+            return;
         }
         element.classList.add("is-names");
         const fragment = document.createDocumentFragment();
         for (const item of list) {
-        const span = document.createElement("span");
-        span.className = "result-name-item";
-        span.textContent = item;
-        fragment.appendChild(span);
+            const span = document.createElement("span");
+            span.className = "result-name-item";
+            span.textContent = item;
+            fragment.appendChild(span);
         }
         element.appendChild(fragment);
+        updateResultNameObservation();
         scheduleResultNameFit({ immediate: true });
         return;
     }
-    const text = typeof value === "string" ? value : String(value || "");
-    if (kind === "placeholder" || !text.trim() || text === "--") {
-        element.classList.add("is-placeholder");
-        element.textContent = "--";
-        element.style.removeProperty("font-size");
+    const text = toStr(value);
+    if (kind === "placeholder" || !text || text === "--") {
+        setPlaceholder();
         return;
     }
-    element.classList.add("is-text");
-    element.textContent = text;
-    scheduleResultNameFit({ immediate: true });
+    setText(text);
 }
 
 function setResultNamePlaceholder() {
@@ -215,7 +240,7 @@ function normalizeDrawMode(value) {
     const key = typeof value === "string" ? value.trim().toLowerCase() : "";
     return DRAW_MODE_ALIASES[key] || DRAW_MODES.SINGLE;
 }
-
+ 
 function normalizeResultStudents(entries) {
     if (!Array.isArray(entries)) {
         return [];
@@ -334,7 +359,11 @@ const PICK_MODE_LABELS = {
     [DRAW_MODES.GROUP]: "抽取小组",
 };
 
-window.addEventListener("resize", scheduleResultNameFit, { passive: true });
+window.addEventListener("resize", () => {
+    if (dom.resultName && dom.resultName.classList.contains("is-names")) {
+        scheduleResultNameFit();
+    }
+}, { passive: true });
 
 init();
 
