@@ -60,10 +60,17 @@ const ACTIONS = Object.freeze({
 
 let resultNameFitFrame = 0;
 
-function scheduleResultNameFit() {
-    if (resultNameFitFrame) {
+function scheduleResultNameFit(opts = {}) {
+    const { immediate = false } = opts;
+    if (immediate) {
+        if (resultNameFitFrame) {
         cancelAnimationFrame(resultNameFitFrame);
+        resultNameFitFrame = 0;
+        }
+        fitResultNameContent();
+        return;
     }
+    if (resultNameFitFrame) cancelAnimationFrame(resultNameFitFrame);
     resultNameFitFrame = requestAnimationFrame(() => {
         resultNameFitFrame = 0;
         fitResultNameContent();
@@ -71,26 +78,16 @@ function scheduleResultNameFit() {
 }
 
 function setupResultNameObserver() {
-    if (typeof ResizeObserver !== "function") {
-        return;
-    }
-    if (resultNameObserver) {
-        resultNameObserver.disconnect();
-    }
+    if (typeof ResizeObserver !== "function") return;
+    if (resultNameObserver) resultNameObserver.disconnect();
     const element = dom.resultName;
-    if (!element) {
-        return;
-    }
+    if (!element) return;
     const observer = new ResizeObserver(() => {
         scheduleResultNameFit();
     });
     observer.observe(element);
-    if (element.parentElement) {
-        observer.observe(element.parentElement);
-    }
-    if (dom.resultCard) {
-        observer.observe(dom.resultCard);
-    }
+    if (element.parentElement) observer.observe(element.parentElement);
+    if (dom.resultCard) observer.observe(dom.resultCard);
     resultNameObserver = observer;
 }
 
@@ -148,30 +145,28 @@ function fitResultNameContent() {
 
 function applyResultName(value, kind) {
     const element = dom.resultName;
-    if (!element) {
-        return;
-    }
+    if (!element) return;
     element.classList.remove("is-placeholder", "is-text", "is-names");
     element.innerHTML = "";
     element.style.removeProperty("font-size");
     if (kind === "names") {
         const list = Array.isArray(value) ? value : [];
         if (!list.length) {
-            element.classList.add("is-placeholder");
-            element.textContent = "--";
-            element.style.removeProperty("font-size");
-            return;
+        element.classList.add("is-placeholder");
+        element.textContent = "--";
+        element.style.removeProperty("font-size");
+        return;
         }
         element.classList.add("is-names");
         const fragment = document.createDocumentFragment();
         for (const item of list) {
-            const span = document.createElement("span");
-            span.className = "result-name-item";
-            span.textContent = item;
-            fragment.appendChild(span);
+        const span = document.createElement("span");
+        span.className = "result-name-item";
+        span.textContent = item;
+        fragment.appendChild(span);
         }
         element.appendChild(fragment);
-        scheduleResultNameFit();
+        scheduleResultNameFit({ immediate: true });
         return;
     }
     const text = typeof value === "string" ? value : String(value || "");
@@ -183,7 +178,7 @@ function applyResultName(value, kind) {
     }
     element.classList.add("is-text");
     element.textContent = text;
-    scheduleResultNameFit();
+    scheduleResultNameFit({ immediate: true });
 }
 
 function setResultNamePlaceholder() {
