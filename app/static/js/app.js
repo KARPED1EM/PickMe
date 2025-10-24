@@ -31,11 +31,38 @@ const dom = {
     historyGroups: $("history-groups"),
     historyEmpty: document.querySelector("[data-history-empty]"),
     resultControlsShell: document.querySelector('.result-controls-shell'),
+    unsupportedOverlay: $("unsupported-overlay"),
 };
 
 const THRESHOLD_W = 1040;
 const THRESHOLD_H = 600;
 const WINDOW_SIZE_CHECK_DELAY = 320;
+
+// Check if device should show unsupported overlay
+function checkDeviceSupport() {
+    const overlay = dom.unsupportedOverlay;
+    if (!overlay) return;
+
+    const width = window.innerWidth || document.documentElement.clientWidth || 0;
+    const height = window.innerHeight || document.documentElement.clientHeight || 0;
+    const isPortrait = height > width;
+    const isMobile = width < 768;
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+    // Show overlay for mobile devices, portrait orientation, or very small screens
+    if (isMobile || (isPortrait && isTouchDevice)) {
+        overlay.classList.add('is-visible');
+    } else {
+        overlay.classList.remove('is-visible');
+    }
+}
+
+// Initial check
+checkDeviceSupport();
+
+// Listen for orientation and resize changes
+window.addEventListener('resize', checkDeviceSupport, { passive: true });
+window.addEventListener('orientationchange', checkDeviceSupport, { passive: true });
 
 const DRAW_MODES = Object.freeze({
     SINGLE: "single",
