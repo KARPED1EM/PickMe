@@ -211,8 +211,12 @@ class Student:
         has_explicit_cooldown = False
         if isinstance(cooldown_payload, dict):
             has_explicit_cooldown = True
-            cooldown_started_at = cooldown_payload.get("started_at", cooldown_started_at)
-            cooldown_expires_at = cooldown_payload.get("expires_at", cooldown_expires_at)
+            cooldown_started_at = cooldown_payload.get(
+                "started_at", cooldown_started_at
+            )
+            cooldown_expires_at = cooldown_payload.get(
+                "expires_at", cooldown_expires_at
+            )
         elif "cooldown_started_at" in obj or "cooldown_expires_at" in obj:
             has_explicit_cooldown = True
         student = Student(
