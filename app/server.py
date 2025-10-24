@@ -48,6 +48,9 @@ def create_app(
 ) -> FastAPI:
     base_dir = Path(__file__).resolve().parent
     templates = Jinja2Templates(directory=str(base_dir / "templates"))
+    templates.env.globals["url_path_for"] = (
+        lambda name, **kw: f"/{name}/{kw.get('path','')}".rstrip("/")
+    )
     app = FastAPI()
     static_dir = base_dir / "static"
     if static_dir.exists():
