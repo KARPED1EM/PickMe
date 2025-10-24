@@ -72,8 +72,3 @@ app/                      # FastAPI application, templates, and static resources
 app/paths.py              # Runtime paths and user data directory locator
 app/metadata.py           # Application metadata (version: v2.0.0)
 ```
-
-
-
-
-
