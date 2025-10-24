@@ -22,6 +22,7 @@ const dom = {
     ignoreCooldown: $("ignore-cooldown"),
     classSwitcher: $("class-switcher"),
     classSwitcherLabel: $("class-switcher-label"),
+    settingsButton: $("settings-button"),
     contextMenu: $("context-menu"),
     modalRoot: $("modal-root"),
     toastStack: $("toast-stack"),
@@ -197,6 +198,12 @@ function toFiniteNumber(value) {
 
 const STORAGE_MODE = window.__APP_STORAGE_MODE__ || "filesystem";
 const USE_BROWSER_STORAGE = STORAGE_MODE === "browser";
+const STORAGE_LOCATION = window.__APP_STORAGE_LOCATION__ || "";
+const APP_META = window.__APP_META__ && typeof window.__APP_META__ === "object" ? window.__APP_META__ : {};
+const RUNTIME_LABELS = {
+    browser: "\u7f51\u9875\u7248",
+    filesystem: "\u5ba2\u6237\u7aef",
+};
 const STORAGE_KEY = "pickme::payload";
 const DEFAULT_CLASS_NAME = "默认班级";
 
@@ -384,6 +391,9 @@ function bindEvents() {
     dom.addStudent.addEventListener("click", () => openStudentModal("create"));
     if (dom.classSwitcher) {
         dom.classSwitcher.addEventListener("click", openClassModal);
+    }
+    if (dom.settingsButton) {
+        dom.settingsButton.addEventListener("click", openSettingsModal);
     }
     dom.studentList.addEventListener("contextmenu", handleContextTrigger);
     dom.cooldownList.addEventListener("contextmenu", handleContextTrigger);
@@ -830,6 +840,9 @@ function updateControls() {
     if (dom.classSwitcher) {
         dom.classSwitcher.disabled = disabled;
     }
+    if (dom.settingsButton) {
+        dom.settingsButton.disabled = disabled;
+    }
     dom.resultCard.classList.toggle("is-animating", state.isAnimating);
     const historyButtons = dom.modalRoot.querySelectorAll("[data-history-action]");
     historyButtons.forEach(button => {
@@ -927,6 +940,104 @@ function buildClassAddModal() {
     </form>
   </div>
 </div>`;
+}
+
+function buildSettingsModal() {
+    const meta = APP_META && typeof APP_META === "object" ? APP_META : {};
+    const appName = escapeHtml(String(meta.name || "Pick Me"));
+    const appVersion = escapeHtml(String(meta.version || "v1.0.0"));
+    const appDeveloper = escapeHtml(String(meta.developer || "KARPED1EM"));
+    const appLicense = escapeHtml(String(meta.license || "MIT License"));
+    const repositoryValue = typeof meta.repository === "string" ? meta.repository.trim() : "";
+    const repositoryLink = repositoryValue
+        ? `<a class="settings-chip-link" href="${escapeHtml(repositoryValue)}" target="_blank" rel="noopener noreferrer">\u8bbf\u95ee\u4ed3\u5e93</a>`
+        : '<span class="settings-chip is-muted">\u6682\u65e0</span>';
+    const runtimeLabel = escapeHtml(RUNTIME_LABELS[STORAGE_MODE] || "\u5ba2\u6237\u7aef");
+    const locationHint = STORAGE_LOCATION || (USE_BROWSER_STORAGE ? "\u6d4f\u89c8\u5668 localStorage" : "\u672a\u63d0\u4f9b");
+    const locationValue = escapeHtml(locationHint);
+    const locationTitle = escapeHtml(locationHint);
+    return `
+<div class="modal-backdrop settings-modal-backdrop">
+  <div class="modal-panel glass settings-modal">
+    <div class="modal-header settings-modal-header">
+      <h2 class="modal-title">\u8bbe\u7f6e\u4e2d\u5fc3</h2>
+      <button type="button" class="btn btn-icon" data-modal-close aria-label="\u5173\u95ed">&times;</button>
+    </div>
+    <div class="modal-body slim-scroll settings-modal-body">
+      <div class="settings-grid">
+        <section class="settings-card settings-about-card">
+          <h3 class="settings-card-title">\u8f6f\u4ef6\u4fe1\u606f</h3>
+          <dl class="settings-data-grid">
+            <div class="settings-data-row">
+              <dt>\u540d\u79f0</dt>
+              <dd>${appName}</dd>
+            </div>
+            <div class="settings-data-row">
+              <dt>\u7248\u672c</dt>
+              <dd>${appVersion}</dd>
+            </div>
+            <div class="settings-data-row">
+              <dt>\u8f6f\u4ef6\u73af\u5883</dt>
+              <dd>${runtimeLabel}</dd>
+            </div>
+            <div class="settings-data-row">
+              <dt>\u5f00\u53d1\u8005</dt>
+              <dd>${appDeveloper}</dd>
+            </div>
+            <div class="settings-data-row">
+              <dt>\u5f00\u6e90\u534f\u8bae</dt>
+              <dd>${appLicense}</dd>
+            </div>
+            <div class="settings-data-row">
+              <dt>GitHub</dt>
+              <dd>${repositoryLink}</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="settings-card settings-runtime-card">
+          <h3 class="settings-card-title">\u7528\u6237\u6570\u636e</h3>
+          <p class="settings-description">\u5bfc\u5165 / \u5bfc\u51fa\u4f1a\u8986\u76d6\u5168\u90e8\u73ed\u7ea7\u3001\u5b66\u751f\u4e0e\u5386\u53f2\u8bb0\u5f55\uff0c\u9002\u7528\u4e8e\u8de8\u8bbe\u5907\u8fc1\u79fb\u6216\u5907\u4efd\u3002</p>
+          <div class="settings-location-card" title="${locationTitle}">
+            <span class="settings-location-label">\u5f53\u524d\u6570\u636e\u8def\u5f84</span>
+            <span class="settings-location-value">${locationValue}</span>
+          </div>
+          <div class="settings-actions-row">
+            <button id="settings-export" type="button" class="btn btn-outline-light settings-action">\u5bfc\u51fa\u6570\u636e</button>
+            <button id="settings-import" type="button" class="btn btn-outline-light settings-action">\u5bfc\u5165\u6570\u636e</button>
+          </div>
+          <input id="settings-import-input" type="file" accept="application/json,.json" class="d-none">
+        </section>
+      </div>
+    </div>
+  </div>
+</div>`;
+}
+
+function openSettingsModal() {
+    if (state.busy || state.isAnimating) {
+        return;
+    }
+    const content = buildSettingsModal();
+    const backdrop = showModal(content);
+    if (!backdrop) {
+        return;
+    }
+    const exportButton = dom.modalRoot.querySelector("#settings-export");
+    if (exportButton) {
+        exportButton.addEventListener("click", handleSettingsExport);
+    }
+    const importButton = dom.modalRoot.querySelector("#settings-import");
+    const importInput = dom.modalRoot.querySelector("#settings-import-input");
+    if (importButton && importInput) {
+        importButton.addEventListener("click", () => {
+            if (importButton.disabled) {
+                return;
+            }
+            importInput.value = "";
+            importInput.click();
+        });
+        importInput.addEventListener("change", handleSettingsImportSelect);
+    }
 }
 
 function openClassAddModal() {
@@ -2785,6 +2896,233 @@ function setBusy(value) {
         closeModeMenu();
     }
     updateControls();
+}
+
+async function handleSettingsExport(event) {
+    const button = event.currentTarget;
+    if (!button || button.disabled) {
+        return;
+    }
+    button.disabled = true;
+    button.classList.add("is-busy");
+    try {
+        if (USE_BROWSER_STORAGE) {
+            await exportDataInBrowser();
+        } else {
+            await exportDataFromServer();
+        }
+        showToast("\u5bfc\u51fa\u6210\u529f", "success");
+    } catch (error) {
+        const message = error && error.message ? error.message : "\u5bfc\u51fa\u5931\u8d25";
+        showToast(message, "error");
+    } finally {
+        button.disabled = false;
+        button.classList.remove("is-busy");
+    }
+}
+
+async function handleSettingsImportSelect(event) {
+    const input = event.currentTarget;
+    if (!input || !input.files || !input.files.length) {
+        return;
+    }
+    const file = input.files[0];
+    const importButton = dom.modalRoot.querySelector("#settings-import");
+    if (importButton) {
+        importButton.disabled = true;
+        importButton.classList.add("is-busy");
+    }
+    let busyManaged = false;
+    try {
+        const payload = await readImportFile(file);
+        const validated = validateImportPayload(payload);
+        if (USE_BROWSER_STORAGE) {
+            applyAppState(validated);
+            render();
+            showToast("\u5bfc\u5165\u6210\u529f", "success");
+            closeModal();
+        } else {
+            setBusy(true);
+            busyManaged = true;
+            await submitImportPayload(validated);
+            render();
+            showToast("\u5bfc\u5165\u6210\u529f", "success");
+            closeModal();
+        }
+    } catch (error) {
+        const message = error && error.message ? error.message : "\u5bfc\u5165\u5931\u8d25";
+        showToast(message, "error");
+    } finally {
+        if (busyManaged) {
+            setBusy(false);
+        }
+        if (importButton) {
+            importButton.disabled = false;
+            importButton.classList.remove("is-busy");
+        }
+        input.value = "";
+    }
+}
+
+async function exportDataInBrowser() {
+    const snapshot = createPersistableSnapshot();
+    if (!snapshot) {
+        throw new Error("\u6682\u65e0\u53ef\u5bfc\u51fa\u7684\u6570\u636e");
+    }
+    state.app = snapshot;
+    persistState(snapshot);
+    const json = JSON.stringify(snapshot, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const filename = generateDataFilename();
+    downloadBlob(blob, filename);
+}
+
+async function exportDataFromServer() {
+    let response;
+    try {
+        response = await fetch("/data/export");
+    } catch {
+        throw new Error("\u5bfc\u51fa\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5");
+    }
+    if (!response.ok) {
+        let message = "\u5bfc\u51fa\u5931\u8d25";
+        try {
+            const data = await response.json();
+            if (data && data.message) {
+                message = data.message;
+            }
+        } catch {
+            // ignore JSON parse failure
+        }
+        throw new Error(message);
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get("Content-Disposition");
+    const filename = parseContentDisposition(disposition) || generateDataFilename();
+    downloadBlob(blob, filename);
+}
+
+async function submitImportPayload(payload) {
+    let response;
+    try {
+        response = await fetch("/data/import", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ data: payload })
+        });
+    } catch {
+        throw new Error("\u5bfc\u5165\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5");
+    }
+    let body = null;
+    try {
+        body = await response.json();
+    } catch {
+        body = null;
+    }
+    if (!response.ok) {
+        const message = body && body.message ? body.message : "\u5bfc\u5165\u5931\u8d25";
+        throw new Error(message);
+    }
+    if (body && body.state) {
+        applyAppState(body.state);
+    }
+}
+
+function validateImportPayload(payload) {
+    if (!payload || typeof payload !== "object") {
+        throw new Error("\u5bfc\u5165\u6587\u4ef6\u683c\u5f0f\u4e0d\u6b63\u786e");
+    }
+    if (!Array.isArray(payload.classes)) {
+        throw new Error("\u5bfc\u5165\u6587\u4ef6\u683c\u5f0f\u4e0d\u652f\u6301");
+    }
+    return payload;
+}
+
+function createPersistableSnapshot() {
+    const classesData = {};
+    state.classData.forEach((value, key) => {
+        classesData[key] = value;
+    });
+    const classesMeta = state.classes.map(item => ({
+        id: item.id,
+        name: item.name,
+        order: item.order,
+        student_count: item.student_count,
+        cooldown_days: item.cooldown_days,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        last_used_at: item.last_used_at
+    }));
+    const normalized = {
+        version: state.app && Number.isFinite(Number(state.app.version)) ? Number(state.app.version) : 0,
+        current_class_id: state.currentClassId,
+        current_class: {
+            id: state.currentClassId,
+            name: state.currentClassName,
+            payload: state.payload
+        },
+        classes: classesMeta,
+        classes_data: classesData
+    };
+    return buildPersistableState(normalized);
+}
+
+function generateDataFilename(prefix = "pickme-data") {
+    const now = new Date();
+    const pad = value => String(value).padStart(2, "0");
+    const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    return `${prefix}-${stamp}.json`;
+}
+
+function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename || "pickme-data.json";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function parseContentDisposition(value) {
+    if (!value) {
+        return "";
+    }
+    const utfMatch = value.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utfMatch && utfMatch[1]) {
+        try {
+            return decodeURIComponent(utfMatch[1]);
+        } catch {
+            return utfMatch[1];
+        }
+    }
+    const asciiMatch = value.match(/filename="?([^";]+)"?/i);
+    if (asciiMatch && asciiMatch[1]) {
+        return asciiMatch[1];
+    }
+    return "";
+}
+
+async function readImportFile(file) {
+    const text = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            resolve(typeof reader.result === "string" ? reader.result : "");
+        };
+        reader.onerror = () => {
+            reject(new Error("\u6587\u4ef6\u8bfb\u53d6\u5931\u8d25"));
+        };
+        reader.readAsText(file, "utf-8");
+    });
+    if (!text.trim()) {
+        throw new Error("\u5bfc\u5165\u6587\u4ef6\u4e3a\u7a7a");
+    }
+    try {
+        return JSON.parse(text);
+    } catch {
+        throw new Error("\u5bfc\u5165\u6587\u4ef6\u683c\u5f0f\u4e0d\u6b63\u786e");
+    }
 }
 
 function syncSelection() {

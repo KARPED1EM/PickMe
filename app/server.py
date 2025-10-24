@@ -6,12 +6,13 @@ from pathlib import Path
 from typing import Any, Callable
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .classrooms import ClassroomsState
 from .draw_service import DrawError, DrawRequest, DrawService
+from .metadata import load_app_metadata
 from .storage import create_storage_backend
 
 ERROR_TEXT = {
@@ -39,7 +40,6 @@ ERROR_TEXT = {
 
 ActionHandler = Callable[[ClassroomsState, dict[str, Any]], JSONResponse]
 
-
 def create_app(
     user_data_dir: Path,
     default_data_dir: Path | None = None,
@@ -53,6 +53,8 @@ def create_app(
         app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
     storage = create_storage_backend(storage_mode, user_data_dir, default_data_dir)
     app.state.storage = storage
+    app_meta = load_app_metadata()
+    app.state.app_meta = app_meta
     draw_service = DrawService()
 
     def current_timestamp() -> float:
@@ -425,8 +427,79 @@ def create_app(
             "initial_data": json.dumps(initial_state, ensure_ascii=False),
             "user_data_path": storage.location_hint,
             "storage_mode": storage.mode,
+            "app_meta": app_meta,
         }
         return templates.TemplateResponse("index.html", context)
+
+    @app.get("/data/export")
+    async def export_data() -> Response:
+        if storage.mode != "filesystem":
+            return error_response(
+                "\u5f53\u524d\u6a21\u5f0f\u8bf7\u5728\u6d4f\u89c8\u5668\u5185\u5bfc\u51fa\u6570\u636e",
+                status=400,
+            )
+        state = storage.load()
+        content = state.serialize()
+        timestamp_label = time.strftime("%Y%m%d-%H%M%S")
+        filename = f"pickme-data-{timestamp_label}.json"
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        }
+        return Response(content=content, media_type="application/json", headers=headers)
+
+    @app.post("/data/import")
+    async def import_data(request: Request) -> JSONResponse:
+        if storage.mode != "filesystem":
+            return error_response(
+                "\u5f53\u524d\u6a21\u5f0f\u8bf7\u5728\u6d4f\u89c8\u5668\u5185\u5bfc\u5165\u6570\u636e",
+                status=400,
+            )
+        data = await request_json(request)
+        if not data:
+            return error_response(
+                "\u672a\u68c0\u6d4b\u5230\u5bfc\u5165\u6570\u636e", status=400
+            )
+        raw_payload = data.get("data")
+        if raw_payload is None:
+            return error_response(
+                "\u672a\u63d0\u4f9b\u5bfc\u5165\u6570\u636e", status=400
+            )
+        parsed_payload = raw_payload
+        if isinstance(raw_payload, str):
+            text = raw_payload.strip()
+            if not text:
+                return error_response(
+                    "\u5bfc\u5165\u6587\u4ef6\u4e3a\u7a7a", status=400
+                )
+            try:
+                parsed_payload = json.loads(text)
+            except json.JSONDecodeError:
+                return error_response(
+                    "\u5bfc\u5165\u6587\u4ef6\u683c\u5f0f\u4e0d\u6b63\u786e", status=400
+                )
+        if not isinstance(parsed_payload, (dict, list)):
+            return error_response(
+                "\u5bfc\u5165\u6587\u4ef6\u683c\u5f0f\u4e0d\u6b63\u786e", status=400
+            )
+        if isinstance(parsed_payload, dict):
+            has_new_format = isinstance(parsed_payload.get("classes"), list)
+            has_legacy_keys = any(
+                key in parsed_payload for key in ("students", "cooldown_days")
+            )
+            if not has_new_format and not has_legacy_keys:
+                return error_response(
+                    "\u5bfc\u5165\u6587\u4ef6\u683c\u5f0f\u4e0d\u652f\u6301", status=400
+                )
+        try:
+            state = ClassroomsState.from_payload(parsed_payload)
+        except Exception:  # noqa: BLE001
+            return error_response(
+                "\u5bfc\u5165\u6587\u4ef6\u683c\u5f0f\u4e0d\u6b63\u786e", status=400
+            )
+        storage.save(state)
+        payload = state.export(current_timestamp())
+        return JSONResponse({"state": payload, "message": "\u5bfc\u5165\u6210\u529f"})
 
     @app.post("/actions")
     async def handle_action(request: Request) -> JSONResponse:
