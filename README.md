@@ -1,51 +1,59 @@
-# PickMe 点名助手
+# PickMe
 
-PickMe 是一款基于 FastAPI 与现代 Web 前端的随机点名工具，可在桌面端（WebView2 封装）或服务器模式下使用，帮助老师轻松开展课堂互动。
+[English](#pickme) | [中文](README_zh.md)
 
-## 功能特点
-- 🎯 支持单人 / 小组随机抽取，冷却时间可配置，避免频繁重复点名
-- 🗂️ 班级管理：可创建、切换、删除班级，数据完全隔离，并支持拖拽调整显示顺序
-- 💾 多终端持久化：桌面模式写入本地用户目录，服务器模式存入浏览器 `localStorage`
-- 🪄 交互友好：右键快捷菜单、冷却队列、抽取历史等信息一目了然
-- 🧳 一键打包：提供 PyInstaller 配置，生成单文件 EXE 方便分发
+PickMe is a random name picker tool built with FastAPI and modern web frontend. It can run as a desktop application (using WebView2) or in server mode, helping teachers facilitate classroom interactions.
 
-## 环境准备
+## Features
+- 🎯 **Random Selection**: Pick individual students or groups with configurable cooldown periods to avoid frequent repetitions
+- 🗂️ **Classroom Management**: Create, switch, and delete classrooms with complete data isolation and drag-to-reorder support
+- 💾 **Multi-Platform Persistence**: Desktop mode writes to local user directory; server mode stores in browser `localStorage`
+- 🪄 **User-Friendly Interface**: Context menus, cooldown queue, pick history, and more for easy interaction
+- 🧳 **One-Click Packaging**: PyInstaller configuration included for single-file EXE distribution
+
+## Platform Support
+
+**Official Support**: Windows (x86, x64, ARM64)
+
+> **Note**: This application officially targets Windows across multiple architectures. Linux and macOS have not been adapted, and compatibility is unknown.
+
+## Environment Setup
+
 ```bash
 python -m venv .venv
 .venv\Scripts\activate            # Windows PowerShell
-# source .venv/bin/activate       # Linux / macOS
 pip install -r requirements.txt
 ```
 
-## 运行方式
+## Running the Application
 
-### 1. 桌面（WebView2）模式
+### 1. Desktop Mode (WebView2)
 ```bash
 python scripts/desktop.pyw
 ```
-首次启动会在本机 `%LOCALAPPDATA%\PickMe` 目录下生成数据文件，并自动打开 WebView2 界面。若系统未安装 WebView2，请先访问微软官方网站安装运行环境。
+On first launch, data files will be created in `%LOCALAPPDATA%\PickMe` and the WebView2 interface will open automatically. If WebView2 Runtime is not installed, the application will prompt you to download it from the Microsoft official website.
 
-### 2. 服务器 / 开发模式
+### 2. Server / Development Mode
 ```bash
 python -m scripts.serve --host 0.0.0.0 --port 8000
 ```
-默认使用 `browser` 存储模式，每位访问者的数据保存在其浏览器 `localStorage` 中，互不影响。也可指定参数：
+By default, uses `browser` storage mode where each visitor's data is saved in their browser's `localStorage` independently. Available parameters:
 
-| 参数 | 说明 |
+| Parameter | Description |
 | ---- | ---- |
-| `--storage browser` | （默认）按客户端浏览器持久化 |
-| `--storage filesystem` | 将数据写入服务器指定目录，支持 `--user-data-dir` 自定义位置 |
-| `--reload` | 开发调试时启用 FastAPI 热重载 |
+| `--storage browser` | (Default) Persist data per client browser |
+| `--storage filesystem` | Write data to server directory, supports `--user-data-dir` for custom location |
+| `--reload` | Enable FastAPI hot reload for development |
 
-Windows 用户亦可执行 `scripts\serve.bat` 快速启动。
+Windows users can also run `scripts\serve.bat` for quick startup.
 
-## 班级与数据存储
-- 首次运行会预置默认班级 **「杭州黑马 AI Python 就业 3期」**，包含示例名单，可直接体验功能。
-- 桌面模式：所有班级数据写入当前用户目录 `%LOCALAPPDATA%\PickMe\students_data.json`。
-- 服务器模式：默认写入访问者浏览器的 `localStorage`；切换浏览器或设备会得到独立的数据副本。
-- 每个班级拥有独立的学生列表、抽取历史与冷却状态；切换班级时会自动持久化当前班级的数据。
+## Classrooms & Data Storage
+- First run includes a default classroom **"杭州黑马 AI Python 就业 3期"** with sample student list for immediate testing.
+- **Desktop Mode**: All classroom data is saved to `%LOCALAPPDATA%\PickMe\pickme_state.json` in the current user's directory.
+- **Server Mode**: Data is saved to the visitor's browser `localStorage` by default; switching browsers or devices creates independent data copies.
+- Each classroom has its own student list, pick history, and cooldown state; data is automatically persisted when switching classrooms.
 
-## 打包单文件 EXE
+## Building Single-File EXE
 ```bash
 pyinstaller scripts/desktop.pyw --clean --onefile --noconsole ^
   --name PickMe ^
@@ -54,15 +62,20 @@ pyinstaller scripts/desktop.pyw --clean --onefile --noconsole ^
   --add-data "app/static;app/static" ^
   --add-data "app/data;app/data"
 ```
-生成的可执行文件位于 `dist/PickMe.exe`。GitHub Actions 工作流 `.github/workflows/build-and-release.yml` 已配置 x86 / x64 / ARM64 多架构打包流程。
+The generated executable will be located at `dist/PickMe.exe`. The GitHub Actions workflow `.github/workflows/build-and-release.yml` is configured to build for x86, x64, and ARM64 architectures.
 
-## 项目结构
+## Project Structure
 ```
-scripts/desktop.pyw   # WebView2 封装入口（桌面模式）
-scripts/serve.py          # FastAPI 服务启动脚本
-app/                      # FastAPI 应用、模板与静态资源
-app/paths.py              # 运行时路径与用户数据目录定位
+scripts/desktop.pyw       # WebView2 wrapper entry point (desktop mode)
+scripts/serve.py          # FastAPI server startup script
+app/                      # FastAPI application, templates, and static resources
+app/paths.py              # Runtime paths and user data directory locator
+app/metadata.py           # Application metadata (version: v2.0.0)
 ```
+
+## License
+
+MIT License
 
 
 
