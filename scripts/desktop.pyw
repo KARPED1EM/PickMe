@@ -142,14 +142,19 @@ def main() -> None:
     server = AppServer(app, host, port)
     server.start()
 
+    api = DesktopApi(user_dir)
+
     window = webview.create_window(
         "Pick Me",
         url=f"http://{host}:{port}",
         width=1280,
         height=860,
-        min_size=(1040, 600),
+        min_size=(1080, 680),
         resizable=True,
+        js_api=api,
     )
+
+    api.set_window(window)
 
     try:
         webview.start(gui="edgechromium", http_server=False)
@@ -159,6 +164,43 @@ def main() -> None:
         server.join(timeout=5)
         if window:
             del window
+
+
+class DesktopApi:
+    def __init__(self, user_dir: Path):
+        self.user_dir = Path(user_dir)
+        self._window = None
+
+    def set_window(self, window):
+        self._window = window
+
+    def save_export(self, data: str, suggested_filename: str | None = None):
+        try:
+            if not suggested_filename:
+                suggested_filename = (
+                    f"pickme-data-{time.strftime('%Y%m%d-%H%M%S')}.json"
+                )
+
+            if self._window is None:
+                return {"ok": False, "message": "窗口未就绪"}
+
+            result = self._window.create_file_dialog(
+                webview.SAVE_DIALOG,
+                directory=str(self.user_dir),
+                save_filename=suggested_filename,
+                file_types=("JSON files (*.json)", "All files (*.*)"),
+            )
+            if not result:
+                return {"ok": False, "message": "已取消保存"}
+
+            path = result[0] if isinstance(result, (list, tuple)) else result
+
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(data)
+
+            return {"ok": True, "path": str(path)}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "message": str(e)}
 
 
 if __name__ == "__main__":

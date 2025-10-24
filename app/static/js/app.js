@@ -2911,9 +2911,8 @@ async function handleSettingsExport(event) {
 
 async function handleSettingsImportSelect(event) {
     const input = event.currentTarget;
-    if (!input || !input.files || !input.files.length) {
-        return;
-    }
+    if (!input || !input.files || !input.files.length) return;
+
     const file = input.files[0];
     const importButton = dom.modalRoot.querySelector("#settings-import");
     if (importButton) {
@@ -2921,18 +2920,20 @@ async function handleSettingsImportSelect(event) {
         importButton.classList.add("is-busy");
     }
     let busyManaged = false;
+
     try {
-        const payload = await readImportFile(file);
-        const validated = validateImportPayload(payload);
         if (USE_BROWSER_STORAGE) {
+            const payload = await readImportFile(file);
+            const validated = validateImportPayload(payload);
             applyAppState(validated);
             requestRender({ immediate: true });
             showToast("\u5bfc\u5165\u6210\u529f", "success");
             closeModal();
         } else {
+            const rawText = await readImportFileAsText(file);
             setBusy(true);
             busyManaged = true;
-            await submitImportPayload(validated);
+            await submitImportPayload(rawText);
             requestRender({ immediate: true });
             showToast("\u5bfc\u5165\u6210\u529f", "success");
             closeModal();
@@ -2941,9 +2942,7 @@ async function handleSettingsImportSelect(event) {
         const message = error && error.message ? error.message : "\u5bfc\u5165\u5931\u8d25";
         showToast(message, "error");
     } finally {
-        if (busyManaged) {
-            setBusy(false);
-        }
+        if (busyManaged) setBusy(false);
         if (importButton) {
             importButton.disabled = false;
             importButton.classList.remove("is-busy");
@@ -2951,6 +2950,45 @@ async function handleSettingsImportSelect(event) {
         input.value = "";
     }
 }
+
+async function readImportFileAsText(file) {
+    const text = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+        reader.onerror = () => reject(new Error("\u6587\u4ef6\u8bfb\u53d6\u5931\u8d25"));
+        reader.readAsText(file, "utf-8");
+    });
+    if (!text.trim()) throw new Error("\u5bfc\u5165\u6587\u4ef6\u4e3a\u7a7a");
+    return text;
+}
+
+async function submitImportPayload(payload) {
+    let response;
+    try {
+        response = await fetch("/data/import", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ data: payload })
+        });
+    } catch {
+        throw new Error("\u5bfc\u5165\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5");
+    }
+
+    let body = null;
+    try {
+        body = await response.json();
+    } catch {
+        body = null;
+    }
+    if (!response.ok) {
+        const message = body && body.message ? body.message : "\u5bfc\u5165\u5931\u8d25";
+        throw new Error(message);
+    }
+    if (body && body.state) {
+        applyAppState(body.state);
+    }
+}
+
 
 async function exportDataInBrowser() {
     const snapshot = createPersistableSnapshot();
@@ -2964,8 +3002,32 @@ async function exportDataInBrowser() {
     const filename = generateDataFilename();
     downloadBlob(blob, filename);
 }
-
 async function exportDataFromServer() {
+    const isWebView = !!window.pywebview || (navigator && /WebView|Edg\//.test(navigator.userAgent || ""));
+    if (isWebView && window.pywebview?.api?.save_export) {
+        let response;
+        try {
+            response = await fetch("/data/export");
+        } catch {
+            throw new Error("\u5bfc\u51fa\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5");
+        }
+        if (!response.ok) {
+            let message = "\u5bfc\u51fa\u5931\u8d25";
+            try {
+                const data = await response.json();
+                if (data && data.message) message = data.message;
+            } catch {}
+            throw new Error(message);
+        }
+        const text = await response.text();
+        const suggested = parseContentDisposition(response.headers.get("Content-Disposition")) || generateDataFilename();
+        const ret = await window.pywebview.api.save_export(text, suggested);
+        if (!ret || ret.ok !== true) {
+            const msg = (ret && ret.message) ? ret.message : "\u4fdd\u5b58\u5931\u8d25";
+            throw new Error(msg);
+        }
+        return;
+    }
     let response;
     try {
         response = await fetch("/data/export");

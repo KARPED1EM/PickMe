@@ -40,6 +40,7 @@ ERROR_TEXT = {
 
 ActionHandler = Callable[[ClassroomsState, dict[str, Any]], JSONResponse]
 
+
 def create_app(
     user_data_dir: Path,
     default_data_dir: Path | None = None,
