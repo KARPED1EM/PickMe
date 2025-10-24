@@ -806,6 +806,15 @@ textarea::-webkit-input-placeholder {
 .batch-input input { border: 0; background: transparent; color: inherit; padding: 0 0.75rem; text-align: center; height: var(--control-height); }
 .batch-input .input-group-text { background: rgba(255, 255, 255, 0.08); border: 0; color: rgba(221, 230, 255, 0.85); display: inline-flex; align-items: center; padding: 0 0.75rem; }
 
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+input[type=number] {
+    -moz-appearance: textfield;
+}
+
 /* Toast */
 .toast-stack {
     position: fixed;
