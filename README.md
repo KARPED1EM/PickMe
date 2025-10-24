@@ -1,8 +1,8 @@
 # PickMe
 
-[English](#pickme) | [中文](README_zh.md)
+English | [中文](README_zh.md)
 
-PickMe is a random name picker tool built with FastAPI and modern web frontend. It can run as a desktop application (using WebView2) or in server mode, helping teachers facilitate classroom interactions.
+PickMe is a random name picker tool built with FastAPI and modern web frontend. It can run as a desktop application (using WebView2) or in server mode.
 
 ## Features
 - 🎯 **Random Selection**: Pick individual students or groups with configurable cooldown periods to avoid frequent repetitions
@@ -72,10 +72,6 @@ app/                      # FastAPI application, templates, and static resources
 app/paths.py              # Runtime paths and user data directory locator
 app/metadata.py           # Application metadata (version: v2.0.0)
 ```
-
-## License
-
-MIT License
 
 
 
