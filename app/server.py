@@ -13,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 from .classrooms import ClassroomsState
 from .draw_service import DrawError, DrawRequest, DrawService
 from .metadata import load_app_metadata
+from .preferences import create_preferences_backend
 from .storage import create_storage_backend
 
 ERROR_TEXT = {
@@ -57,6 +58,8 @@ def create_app(
         app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
     storage = create_storage_backend(storage_mode, user_data_dir, default_data_dir)
     app.state.storage = storage
+    preferences = create_preferences_backend(storage_mode, user_data_dir)
+    app.state.preferences = preferences
     app_meta = load_app_metadata()
     app.state.app_meta = app_meta
     draw_service = DrawService()
@@ -523,5 +526,22 @@ def create_app(
             return error_response(translate_error(str(error)), status=400)
         except KeyError as error:
             return error_response(translate_error(str(error)), status=404)
+
+    @app.get("/preferences")
+    async def get_preferences(request: Request) -> JSONResponse:
+        """Get user preferences."""
+        data = await request_json(request)
+        prefs = preferences.load(data)
+        return JSONResponse(prefs)
+
+    @app.post("/preferences")
+    async def save_preferences(request: Request) -> JSONResponse:
+        """Save user preferences."""
+        data = await request_json(request)
+        prefs = data.get("preferences")
+        if not isinstance(prefs, dict):
+            return error_response("Invalid preferences data", status=400)
+        preferences.save(prefs)
+        return JSONResponse({"message": "Preferences saved successfully"})
 
     return app

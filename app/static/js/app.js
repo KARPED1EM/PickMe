@@ -2928,6 +2928,15 @@ async function handleSettingsImportSelect(event) {
             const payload = await readImportFile(file);
             const validated = validateImportPayload(payload);
             applyAppState(validated);
+            // Defensive check: verify persistence was successful
+            if (USE_BROWSER_STORAGE) {
+                const stored = readStoredState();
+                if (!hasValidStoredState(stored)) {
+                    console.warn("Import succeeded but state was not persisted correctly");
+                    // Retry persistence
+                    persistState(state.app || validated);
+                }
+            }
             requestRender({ immediate: true });
             showToast("\u5bfc\u5165\u6210\u529f", "success");
             closeModal();
@@ -2996,6 +3005,32 @@ async function exportDataInBrowser() {
     const snapshot = createPersistableSnapshot();
     if (!snapshot) {
         throw new Error("\u6682\u65e0\u53ef\u5bfc\u51fa\u7684\u6570\u636e");
+    }
+    // Defensive check: ensure we have valid data to export
+    if (!snapshot.classes || !Array.isArray(snapshot.classes) || snapshot.classes.length === 0) {
+        console.warn("Export snapshot has no classes, regenerating from state");
+        // Try to rebuild snapshot from current state
+        const rebuilt = {
+            version: state.app?.version || 1,
+            current_class_id: state.currentClassId,
+            current_class: {
+                id: state.currentClassId,
+                name: state.currentClassName,
+                payload: state.payload
+            },
+            classes: state.classes || [],
+            classes_data: Object.fromEntries(state.classData || new Map())
+        };
+        if (rebuilt.classes.length === 0) {
+            throw new Error("\u6682\u65e0\u53ef\u5bfc\u51fa\u7684\u6570\u636e");
+        }
+        state.app = rebuilt;
+        persistState(rebuilt);
+        const json = JSON.stringify(rebuilt, null, 2);
+        const blob = new Blob([json], { type: "application/json" });
+        const filename = generateDataFilename();
+        downloadBlob(blob, filename);
+        return;
     }
     state.app = snapshot;
     persistState(snapshot);
