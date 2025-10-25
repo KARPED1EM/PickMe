@@ -548,10 +548,13 @@ function applyAppState(rawState) {
             state.classData.set(classId, normalizePayload(payload));
         }
     });
-    const rawCurrent = normalized.current_class && typeof normalized.current_class === "object" ? normalized.current_class : {};
-    let payloadSource = rawCurrent.payload;
-    if (!payloadSource && state.classData.has(state.currentClassId)) {
+    // Prioritize classes_data over current_class.payload to avoid losing data during import
+    let payloadSource = null;
+    if (state.classData.has(state.currentClassId)) {
         payloadSource = state.classData.get(state.currentClassId);
+    } else {
+        const rawCurrent = normalized.current_class && typeof normalized.current_class === "object" ? normalized.current_class : {};
+        payloadSource = rawCurrent.payload;
     }
     state.payload = normalizePayload(payloadSource || {});
     state.classData.set(state.currentClassId, state.payload);
