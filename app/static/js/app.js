@@ -3353,11 +3353,25 @@ function normalizeAppState(raw) {
         currentId = synthesizedId;
         currentClass.id = synthesizedId;
     }
+    // Extract classes_data from source, preserving classroom data for all classes
+    const classesData = {};
+    if (source.classes_data && typeof source.classes_data === "object") {
+        Object.assign(classesData, source.classes_data);
+    }
+    // Also extract data from individual class items in the classes array
+    classes.forEach(item => {
+        if (item && typeof item === "object" && item.id && item.data) {
+            if (!classesData[item.id]) {
+                classesData[item.id] = item.data;
+            }
+        }
+    });
     return {
         version: Number.isFinite(Number(source.version)) ? Number(source.version) : 0,
         current_class_id: currentId || (normalizedClasses.length ? normalizedClasses[0].id : ""),
         current_class: currentClass,
-        classes: normalizedClasses
+        classes: normalizedClasses,
+        classes_data: classesData
     };
 }
 
