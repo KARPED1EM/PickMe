@@ -584,7 +584,6 @@ textarea::-webkit-input-placeholder {
     max-height: none;
     min-height: 0;
     overflow-y: auto;
-    padding-right: 6px;
     padding-top: 1px;
 }
 
@@ -645,7 +644,7 @@ textarea::-webkit-input-placeholder {
 }
 
 .history-panel { flex: 1 1 auto; display: flex; flex-direction: column; gap: 1rem; min-height: 0; position: relative; overflow-y: auto; }
-.history-groups { display: flex; flex-direction: column; gap: 1.05rem; min-height: 0; margin-right: 0.3rem; }
+.history-groups { display: flex; flex-direction: column; gap: 1.05rem; min-height: 0; }
 .history-group { display: flex; flex-direction: column; gap: 0.85rem; }
 .history-subgroup { display: flex; flex-direction: column; gap: 0.7rem; }
 .history-subgroup-label { font-size: 0.78rem; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(173, 190, 255, 0.62); }
@@ -1089,11 +1088,12 @@ body.modal-open { overflow: hidden; }
 .list-toolbar,
 .cooldown-toolbar,
 .list-card,
+.student-item,
 .history-card,
+.history-entry,
 .result-card {
     break-inside: avoid;
     -webkit-column-break-inside: avoid;
-    margin-bottom: var(--app-gap);
 }
 
 @media (min-width: 768px) {
@@ -1105,6 +1105,8 @@ body.modal-open { overflow: hidden; }
     .app-main { height: 100vh; padding-bottom: 1.5rem; box-sizing: border-box; }
     .app-grid { --app-gap: 1.5rem; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); gap: var(--app-gap); }
     .app-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--app-gap); }
+    .history-groups,
+    .student-list {padding-right: 0.7rem;}
     .result-controls-wrapper,
     .controls-left,
     .controls-right,
