@@ -43,9 +43,7 @@ class DrawHistoryEntry:
         self.students = self._normalize_students(students)
         self.group = self._normalize_group(group)
         self.count = (
-            int(count)
-            if isinstance(count, (int, float))
-            else len(self.students)
+            int(count) if isinstance(count, (int, float)) else len(self.students)
         )
         self.requested_count = (
             int(requested_count)
@@ -430,7 +428,9 @@ class StudentsCms:
         else:
             students_data = raw
         for item in students_data:
-            student = Student.deserialize(item, default_cooldown_days=manager.__pick_cooldown)
+            student = Student.deserialize(
+                item, default_cooldown_days=manager.__pick_cooldown
+            )
             manager.add_student(student)
         manager.load_history(history_payload)
         return manager
