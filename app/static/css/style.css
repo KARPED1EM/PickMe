@@ -41,12 +41,6 @@
     opacity: 0.8;
 }
 
-/* Show overlay on portrait orientation or small viewports */
-@media (max-width: 767px), (orientation: portrait) and (max-height: 1024px) {
-    .unsupported-overlay {
-        display: flex;
-    }
-}
 
 /* Base */
 .app-body {
@@ -997,3 +991,76 @@ input[type=number] {
 
 .body.modal-open,
 body.modal-open { overflow: hidden; }
+
+/* Responsive Design */
+
+/* Responsive layout adjustments */
+@media (max-width: 1199px) {
+    .app-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 991px) {
+    .app-grid {
+        --app-gap: 1.25rem;
+    }
+    .result-grid {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+}
+
+@media (max-width: 767px) {
+    .app-grid {
+        --app-gap: 1rem;
+    }
+    .app-main {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    .result-grid {
+        gap: 1rem;
+    }
+    .app-lists {
+        grid-template-columns: 1fr;
+    }
+    .result-controls-wrapper {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    .controls-left,
+    .controls-right {
+        width: 100%;
+    }
+    .result-controls {
+        width: 100%;
+    }
+    .result-action {
+        align-self: stretch;
+    }
+    .result-action-split {
+        width: 100%;
+    }
+    .result-action-button {
+        flex: 1;
+    }
+    .list-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+    .list-toolbar {
+        flex-direction: column;
+        width: 100%;
+        flex: 1 1 auto;
+    }
+    .search-box {
+        width: 100%;
+        flex: 1 1 auto;
+    }
+    .toolbar-btn {
+        width: 100%;
+    }
+}

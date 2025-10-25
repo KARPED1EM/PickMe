@@ -38,7 +38,6 @@ const THRESHOLD_W = 1040;
 const THRESHOLD_H = 600;
 const WINDOW_SIZE_CHECK_DELAY = 320;
 
-
 // Check if device should show unsupported overlay
 function checkDeviceSupport() {
     const overlay = dom.unsupportedOverlay;
@@ -46,11 +45,12 @@ function checkDeviceSupport() {
 
     const width = window.innerWidth || document.documentElement.clientWidth || 0;
     const height = window.innerHeight || document.documentElement.clientHeight || 0;
+    const isPortrait = height > width;
+    const isMobile = width < 768;
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-    // Show overlay only for extremely small screens
-    const isExtremelySmall = width < 480 && height < 600;
-    
-    if (isExtremelySmall) {
+    // Show overlay for mobile devices, portrait orientation, or very small screens
+    if (isMobile || (isPortrait && isTouchDevice)) {
         overlay.classList.add('is-visible');
     } else {
         overlay.classList.remove('is-visible');
