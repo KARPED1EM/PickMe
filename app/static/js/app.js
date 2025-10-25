@@ -35,7 +35,6 @@ const dom = {
     unsupportedOverlay: $("unsupported-overlay"),
 };
 
-// Check if device should show unsupported overlay
 function checkDeviceSupport() {
     const overlay = dom.unsupportedOverlay;
     if (!overlay) return;
@@ -43,15 +42,18 @@ function checkDeviceSupport() {
     const width = window.innerWidth || document.documentElement.clientWidth || 0;
     const height = window.innerHeight || document.documentElement.clientHeight || 0;
 
-    // Show overlay only for extremely small screens
-    const isExtremelySmall = width < 480 && height < 600;
-    
+    const isExtremelySmall = width < 340 || height < 600;
+
     if (isExtremelySmall) {
         overlay.classList.add('is-visible');
     } else {
         overlay.classList.remove('is-visible');
     }
 }
+
+checkDeviceSupport();
+window.addEventListener('resize', checkDeviceSupport, { passive: true });
+window.addEventListener('orientationchange', checkDeviceSupport, { passive: true });
 
 const DRAW_MODES = Object.freeze({
     SINGLE: "single",
@@ -870,7 +872,6 @@ function highlightHistoryEntry() {
     const element = dom.historyList.querySelector(selector);
     if (element) {
         element.classList.add("is-highlight");
-        // Only auto-scroll when history card is in sidebar (width >= 1200px)
         const isInSidebar = window.innerWidth >= 1200;
         if (isInSidebar) {
             element.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -4002,8 +4003,6 @@ function runSelectionAnimation(result) {
     });
 }
 
-
-// Back to top button functionality
 if (dom.backToTop) {
     let scrollTimeout;
     const handleScroll = () => {

@@ -9,6 +9,12 @@
     <link rel="stylesheet" href="{{ url_path_for('static', path='css/style.css') }}">
 </head>
 <body class="app-body">
+    <div class="unsupported-overlay" id="unsupported-overlay">
+        <div class="unsupported-message">
+            <h1>屏幕尺寸过小</h1>
+            <p>此应用需要更大的屏幕尺寸才能正常显示。请使用更大的设备或调整浏览器窗口大小。</p>
+        </div>
+    </div>
 <div class="app-backdrop"></div>
 <main class="app-main container-xxl px-3 px-lg-4 py-4">
     <div class="app-grid">
