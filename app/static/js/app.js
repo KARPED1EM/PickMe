@@ -4011,3 +4011,78 @@ if (dom.backToTop) {
     });
 }
 
+function initFirstVisitPopup() {
+    const STORAGE_KEY = 'pickme_first_visit_shown';
+    
+    if (localStorage.getItem(STORAGE_KEY)) {
+        return;
+    }
+    
+    const isClientApp = !!window.pywebview || (navigator && /WebView|Edg\//.test(navigator.userAgent || ""));
+    
+    let title, content, linkUrl, linkText;
+    
+    if (isClientApp) {
+        title = "You're using the client app";
+        content = `
+            <p>Welcome! You're currently using the <span class="first-visit-highlight">client app</span>.</p>
+            <p>Did you know there's also a <a href="https://pickme.leever.cn" class="first-visit-link" target="_blank" rel="noopener noreferrer">web version</a>? It offers lower performance overhead and requires no extra dependencies.</p>
+        `;
+    } else {
+        const repoUrl = APP_META?.repository || 'https://github.com/KARPED1EM/PickMe';
+        const latestReleaseUrl = `${repoUrl}/releases/latest`;
+        title = "You're using the web version";
+        content = `
+            <p>Welcome! You're currently using the <span class="first-visit-highlight">web version</span>.</p>
+            <p>Want to try the <a href="${latestReleaseUrl}" class="first-visit-link" target="_blank" rel="noopener noreferrer">client app</a>? It supports offline use, offers better security, and provides privacy protection.</p>
+        `;
+    }
+    
+    const overlay = document.createElement('div');
+    overlay.className = 'first-visit-overlay';
+    overlay.innerHTML = `
+        <div class="first-visit-modal">
+            <div class="first-visit-header">
+                <div class="first-visit-icon">👋</div>
+                <h2 class="first-visit-title">${title}</h2>
+            </div>
+            <div class="first-visit-content">
+                ${content}
+            </div>
+            <div class="first-visit-footer">
+                <button class="first-visit-button" data-dismiss>Got it</button>
+            </div>
+        </div>
+    `;
+    
+    const dismissButton = overlay.querySelector('[data-dismiss]');
+    dismissButton.addEventListener('click', () => {
+        localStorage.setItem(STORAGE_KEY, 'true');
+        overlay.style.animation = 'fadeOut 0.3s ease-out forwards';
+        setTimeout(() => {
+            overlay.remove();
+        }, 300);
+    });
+    
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes fadeOut {
+            to { opacity: 0; }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    document.body.appendChild(overlay);
+    
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            dismissButton.click();
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(initFirstVisitPopup, 500);
+});
+
+
