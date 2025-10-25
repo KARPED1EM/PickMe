@@ -4027,18 +4027,18 @@ function initFirstVisitPopup() {
     let title, content;
     
     if (isClientApp) {
-        title = "你正在使用客户端";
+        title = "您正在使用客户端";
         content = `
-            <p>欢迎！你当前使用的是<span class="first-visit-current">客户端</span>。</p>
-            <p>试试 <a href="https://pickme.leever.cn" class="first-visit-recommend" target="_blank" rel="noopener noreferrer">网页版</a> 吧？性能开销更低，无需额外依赖。</p>
+            <p>您也可以试试 <a href="https://pickme.leever.cn" class="first-visit-recommend" target="_blank" rel="noopener noreferrer">网页版</a> 👈</p>
+            <p>性能开销更低，无需额外依赖~</p>
         `;
     } else {
         const repoUrl = APP_META?.repository || 'https://github.com/KARPED1EM/PickMe';
         const latestReleaseUrl = `${repoUrl}/releases/latest`;
-        title = "你正在使用网页版";
+        title = "您正在使用网页版";
         content = `
-            <p>欢迎！你当前使用的是<span class="first-visit-current">网页版</span>。</p>
-            <p>试试 <a href="${latestReleaseUrl}" class="first-visit-recommend" target="_blank" rel="noopener noreferrer">客户端</a> 吧？支持离线使用，安全性和隐私保护更佳。</p>
+            <p>您也可以试试 <a href="${latestReleaseUrl}" class="first-visit-recommend" target="_blank" rel="noopener noreferrer">客户端</a> 👈</p>
+            <p>支持离线使用，安全性和隐私保护更佳~</p>
         `;
     }
     

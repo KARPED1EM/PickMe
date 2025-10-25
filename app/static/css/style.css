@@ -1279,13 +1279,6 @@ body.modal-open { overflow: hidden; }
     margin-bottom: 0;
 }
 
-/* Current mode indicator - subtle */
-.first-visit-current {
-    color: rgba(221, 230, 255, 0.7);
-    font-weight: 400;
-}
-
-/* Recommended link - prominent with box styling */
 .first-visit-recommend {
     display: inline-block;
     padding: 0.2rem 0.6rem;
@@ -1368,5 +1361,4 @@ body.modal-open { overflow: hidden; }
         padding: 0.7rem 1.5rem;
         font-size: 0.9rem;
     }
-}
 }
