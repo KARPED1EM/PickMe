@@ -202,6 +202,44 @@ class DesktopApi:
         except Exception as e:  # noqa: BLE001
             return {"ok": False, "message": str(e)}
 
+    def get_preference(self, key: str):
+        """Get a preference value from persistent storage."""
+        try:
+            prefs_file = self.user_dir / "preferences.json"
+            if not prefs_file.exists():
+                return {"ok": True, "value": None}
+            
+            import json
+            with open(prefs_file, "r", encoding="utf-8") as f:
+                prefs = json.load(f)
+            
+            return {"ok": True, "value": prefs.get(key)}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "message": str(e)}
+
+    def set_preference(self, key: str, value):
+        """Set a preference value in persistent storage."""
+        try:
+            import json
+            prefs_file = self.user_dir / "preferences.json"
+            
+            prefs = {}
+            if prefs_file.exists():
+                with open(prefs_file, "r", encoding="utf-8") as f:
+                    prefs = json.load(f)
+            
+            prefs[key] = value
+            
+            # Ensure directory exists
+            self.user_dir.mkdir(parents=True, exist_ok=True)
+            
+            with open(prefs_file, "w", encoding="utf-8") as f:
+                json.dump(prefs, f, ensure_ascii=False, indent=2)
+            
+            return {"ok": True}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "message": str(e)}
+
 
 if __name__ == "__main__":
     main()
