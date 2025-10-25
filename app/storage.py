@@ -5,7 +5,10 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from .classrooms import ClassroomsState
-from .data_manager import DataManager
+from .state_manager import StateManager
+
+# Backward compatibility
+DataManager = StateManager
 
 
 class StorageBackend(Protocol):
@@ -27,20 +30,20 @@ class FileStorageBackend:
     mode = "filesystem"
 
     def __init__(self, user_dir: Path, default_data_dir: Path | None = None) -> None:
-        DataManager.configure(user_dir, default_data_dir)
+        StateManager.configure(user_dir, default_data_dir)
         self._lock = threading.RLock()
-        self.location_hint = str(DataManager.user_data_dir())
+        self.location_hint = str(StateManager.user_data_dir())
         self._default_payload = _load_default_payload(default_data_dir)
 
     def load(self, request_data: dict[str, Any] | None = None) -> ClassroomsState:
         with self._lock:
-            data = DataManager.get_students_data()
+            data = StateManager.load_state()
         return ClassroomsState.from_payload(data, fallback=self._default_payload)
 
     def save(self, state: ClassroomsState) -> None:
         payload = state.serialize()
         with self._lock:
-            DataManager.save_students_data(payload)
+            StateManager.save_state(payload)
 
 
 class BrowserStorageBackend:
@@ -82,9 +85,9 @@ def create_storage_backend(
 
 
 def _load_default_payload(default_data_dir: Path | None) -> str:
-    payload = DataManager.DEFAULT_PAYLOAD
+    payload = StateManager.DEFAULT_PAYLOAD
     if default_data_dir:
-        candidate = default_data_dir / DataManager.DEFAULT_FILE
+        candidate = default_data_dir / StateManager.DEFAULT_FILE
         if candidate.exists():
             try:
                 return candidate.read_text(encoding="utf-8")

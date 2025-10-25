@@ -297,7 +297,10 @@ const RUNTIME_LABELS = {
     browser: "\u7f51\u9875\u7248",
     filesystem: "\u5ba2\u6237\u7aef",
 };
-const STORAGE_KEY = "pickme::payload";
+
+// Storage keys for browser localStorage
+const STORAGE_KEY = "pickme::state";
+const PREFERENCES_KEY = "pickme::preferences";
 
 function isWebViewEnvironment() {
     return !!window.pywebview || (navigator && /WebView|Edg\//.test(navigator.userAgent || ""));
