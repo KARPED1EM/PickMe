@@ -149,7 +149,7 @@ def main() -> None:
         url=f"http://{host}:{port}",
         width=1280,
         height=860,
-        min_size=(1080, 680),
+        min_size=(360, 650),
         resizable=True,
         js_api=api,
     )
