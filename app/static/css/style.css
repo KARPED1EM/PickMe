@@ -5,42 +5,6 @@
     --control-padding-x: 1.2rem;
 }
 
-/* Mobile/Portrait Orientation Block */
-.unsupported-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    background: #000;
-    color: #fff;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
-    text-align: center;
-}
-
-.unsupported-overlay.is-visible {
-    display: flex;
-}
-
-.unsupported-message {
-    max-width: 600px;
-    line-height: 1.6;
-}
-
-.unsupported-message h1 {
-    font-size: 1.5rem;
-    margin: 0 0 1rem;
-    font-weight: 600;
-}
-
-.unsupported-message p {
-    font-size: 1rem;
-    margin: 0;
-    opacity: 0.8;
-}
-
 
 /* Base */
 .app-body {
@@ -994,10 +958,56 @@ body.modal-open { overflow: hidden; }
 
 /* Responsive Design */
 
+/* Back to top button */
+.back-to-top {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ff0050, #ff416d);
+    border: 0;
+    color: #fff;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(255, 65, 109, 0.4);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    z-index: 1100;
+    opacity: 0;
+}
+
+.back-to-top.is-visible {
+    display: flex;
+    opacity: 1;
+}
+
+.back-to-top:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(255, 65, 109, 0.5);
+}
+
+.back-to-top svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
 /* Responsive layout adjustments */
 @media (max-width: 1199px) {
     .app-grid {
         grid-template-columns: 1fr;
+    }
+    /* Ensure proper stacking order in masonry layout */
+    .app-primary {
+        order: 1;
+    }
+    .app-lists {
+        order: 2;
+    }
+    .app-history {
+        order: 3;
     }
 }
 
@@ -1062,5 +1072,11 @@ body.modal-open { overflow: hidden; }
     }
     .toolbar-btn {
         width: 100%;
+    }
+    .back-to-top {
+        bottom: 1.5rem;
+        right: 1.5rem;
+        width: 2.75rem;
+        height: 2.75rem;
     }
 }

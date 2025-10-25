@@ -26,6 +26,7 @@ const dom = {
     contextMenu: $("context-menu"),
     modalRoot: $("modal-root"),
     toastStack: $("toast-stack"),
+    backToTop: $("back-to-top"),
     resultCard: document.querySelector(".result-card"),
     historyList: $("history-list"),
     historyGroups: $("history-groups"),
@@ -33,11 +34,6 @@ const dom = {
     resultControlsShell: document.querySelector('.result-controls-shell'),
     unsupportedOverlay: $("unsupported-overlay"),
 };
-
-const THRESHOLD_W = 1040;
-const THRESHOLD_H = 600;
-const WINDOW_SIZE_CHECK_DELAY = 320;
-
 
 // Check if device should show unsupported overlay
 function checkDeviceSupport() {
@@ -56,13 +52,6 @@ function checkDeviceSupport() {
         overlay.classList.remove('is-visible');
     }
 }
-
-// Initial check
-checkDeviceSupport();
-
-// Listen for orientation and resize changes
-window.addEventListener('resize', checkDeviceSupport, { passive: true });
-window.addEventListener('orientationchange', checkDeviceSupport, { passive: true });
 
 const DRAW_MODES = Object.freeze({
     SINGLE: "single",
@@ -357,9 +346,6 @@ const state = {
 const TOAST_DEFAULT_DURATION = 2400;
 const toastStates = new Map();
 let toastPauseDepth = 0;
-let windowSizeCheckTimer = 0;
-let windowSizeWarningLocked = false;
-let windowSizeWarningToast = null;
 let animationInterval = null;
 let animationTimeout = null;
 let renderFrameId = 0;
@@ -396,9 +382,7 @@ const PICK_MODE_LABELS = {
 window.addEventListener("resize", () => {
     if (dom.resultName && dom.resultName.classList.contains("is-names")) {
         scheduleResultNameFit();
-    }
-    scheduleWindowSizeCheck();
-}, { passive: true });
+    }}, { passive: true });
 
 init();
 
@@ -409,7 +393,6 @@ function init() {
     bindEvents();
     setupResultNameObserver();
     scheduleResultNameFit();
-    scheduleWindowSizeCheck(true);
     setPickMode(state.pickMode || DRAW_MODES.SINGLE, { silent: true, skipControls: true });
     requestRender({ immediate: true });
 }
@@ -887,7 +870,11 @@ function highlightHistoryEntry() {
     const element = dom.historyList.querySelector(selector);
     if (element) {
         element.classList.add("is-highlight");
-        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        // Only auto-scroll when history card is in sidebar (width >= 1200px)
+        const isInSidebar = window.innerWidth >= 1200;
+        if (isInSidebar) {
+            element.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
         setTimeout(() => {
             element.classList.remove("is-highlight");
         }, 1400);
@@ -4015,52 +4002,33 @@ function runSelectionAnimation(result) {
     });
 }
 
-function scheduleWindowSizeCheck(immediate = false) {
-    if (immediate) {
-        if (windowSizeCheckTimer) {
-            clearTimeout(windowSizeCheckTimer);
-            windowSizeCheckTimer = 0;
-        }
-        runWindowSizeCheck();
-        return;
-    }
-    if (windowSizeCheckTimer) {
-        clearTimeout(windowSizeCheckTimer);
-    }
-    windowSizeCheckTimer = setTimeout(() => {
-        windowSizeCheckTimer = 0;
-        runWindowSizeCheck();
-    }, WINDOW_SIZE_CHECK_DELAY);
+
+// Back to top button functionality
+if (dom.backToTop) {
+    let scrollTimeout;
+    const handleScroll = () => {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const isInMasonryLayout = window.innerWidth < 1200;
+            const showButton = isInMasonryLayout && scrollTop > 300;
+            
+            if (showButton) {
+                dom.backToTop.classList.add('is-visible');
+            } else {
+                dom.backToTop.classList.remove('is-visible');
+            }
+        }, 100);
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleScroll, { passive: true });
+    
+    dom.backToTop.addEventListener('click', () => {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    });
 }
 
-function runWindowSizeCheck() {
-    const width = Math.max(window.innerWidth || 0, document.documentElement ? document.documentElement.clientWidth : 0);
-    const height = Math.max(window.innerHeight || 0, document.documentElement ? document.documentElement.clientHeight : 0);
-    const meetsThreshold = width >= THRESHOLD_W && height >= THRESHOLD_H;
-    if (meetsThreshold) {
-        if (windowSizeWarningToast) {
-            dismissToast(windowSizeWarningToast);
-            windowSizeWarningToast = null;
-        }
-        windowSizeWarningLocked = false;
-        return;
-    }
-    if (windowSizeWarningLocked) {
-        return;
-    }
-    windowSizeWarningLocked = true;
-    const toast = showToast("建议将窗口调至 1040×600 以上，以避免可能的显示异常~", { type: "warning", duration: 4800 });
-    if (toast) {
-        windowSizeWarningToast = toast;
-        const handleRemoval = (event) => {
-            if (event.target !== toast || !toast.classList.contains("is-leaving")) {
-                return;
-            }
-            if (windowSizeWarningToast === toast) {
-                windowSizeWarningToast = null;
-            }
-            toast.removeEventListener("animationend", handleRemoval);
-        };
-        toast.addEventListener("animationend", handleRemoval);
-    }
-}

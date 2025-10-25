@@ -9,12 +9,6 @@
     <link rel="stylesheet" href="{{ url_path_for('static', path='css/style.css') }}">
 </head>
 <body class="app-body">
-<div class="unsupported-overlay" id="unsupported-overlay">
-    <div class="unsupported-message">
-        <h1>屏幕尺寸过小</h1>
-        <p>此应用需要更大的屏幕尺寸才能正常显示。请使用更大的设备或调整浏览器窗口大小。</p>
-    </div>
-</div>
 <div class="app-backdrop"></div>
 <main class="app-main container-xxl px-3 px-lg-4 py-4">
     <div class="app-grid">
@@ -170,6 +164,12 @@
 
 <div id="context-menu" class="context-menu d-none"></div>
 <div id="modal-root" class="modal-root d-none"></div>
+<button id="back-to-top" class="back-to-top" aria-label="回到顶部">
+    <svg viewBox="0 0 16 16" fill="none">
+        <path d="M8 4l-6 6h12L8 4z" fill="currentColor"/>
+    </svg>
+</button>
+
 <div id="toast-stack" class="toast-stack" aria-live="polite" aria-atomic="false"></div>
 
 <script>
