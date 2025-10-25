@@ -1119,3 +1119,57 @@ body.modal-open { overflow: hidden; }
     .history-entry,
     .result-card { margin-bottom: 0; }
 }
+
+@media (max-width: 767px) {
+    .app-grid {
+        --app-gap: 1rem;
+    }
+    .app-main {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    .result-grid {
+        gap: 1rem;
+    }
+    .app-lists {
+        grid-template-columns: 1fr;
+    }
+    .result-controls-wrapper {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    .controls-left,
+    .controls-right {
+        width: 100%;
+    }
+    .result-controls {
+        width: 100%;
+    }
+    .result-action {
+        align-self: stretch;
+    }
+    .result-action-split {
+        width: 100%;
+    }
+    .result-action-button {
+        flex: 1;
+    }
+    .list-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+    .list-toolbar {
+        flex-direction: column;
+        width: 100%;
+        flex: 1 1 auto;
+    }
+    .search-box {
+        width: 100%;
+        flex: 1 1 auto;
+    }
+    .toolbar-btn {
+        width: 100%;
+    }
+}
