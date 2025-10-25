@@ -19,10 +19,6 @@
     text-align: center;
 }
 
-.unsupported-overlay.is-visible {
-    display: flex;
-}
-
 .unsupported-message {
     max-width: 600px;
     line-height: 1.6;
@@ -38,6 +34,12 @@
     font-size: 1rem;
     margin: 0;
     opacity: 0.8;
+}
+
+@media (max-width: 340px), (max-height: 600px) {
+    .unsupported-overlay {
+        display: flex;
+    }
 }
 
 .app-body {

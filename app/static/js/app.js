@@ -35,26 +35,6 @@ const dom = {
     unsupportedOverlay: $("unsupported-overlay"),
 };
 
-function checkDeviceSupport() {
-    const overlay = dom.unsupportedOverlay;
-    if (!overlay) return;
-
-    const width = window.innerWidth || document.documentElement.clientWidth || 0;
-    const height = window.innerHeight || document.documentElement.clientHeight || 0;
-
-    const isExtremelySmall = width < 340 || height < 600;
-
-    if (isExtremelySmall) {
-        overlay.classList.add('is-visible');
-    } else {
-        overlay.classList.remove('is-visible');
-    }
-}
-
-checkDeviceSupport();
-window.addEventListener('resize', checkDeviceSupport, { passive: true });
-window.addEventListener('orientationchange', checkDeviceSupport, { passive: true });
-
 const DRAW_MODES = Object.freeze({
     SINGLE: "single",
     BATCH: "batch",
