@@ -4027,18 +4027,18 @@ function initFirstVisitPopup() {
     let title, content;
     
     if (isClientApp) {
-        title = "You're using the client app";
+        title = "你正在使用客户端";
         content = `
-            <p>Welcome! You're currently using the <span class="first-visit-highlight">client app</span>.</p>
-            <p>Did you know there's also a <a href="https://pickme.leever.cn" class="first-visit-link" target="_blank" rel="noopener noreferrer">web version</a>? It offers lower performance overhead and requires no extra dependencies.</p>
+            <p>欢迎！你当前使用的是<span class="first-visit-current">客户端</span>。</p>
+            <p>试试 <a href="https://pickme.leever.cn" class="first-visit-recommend" target="_blank" rel="noopener noreferrer">网页版</a> 吧？性能开销更低，无需额外依赖。</p>
         `;
     } else {
         const repoUrl = APP_META?.repository || 'https://github.com/KARPED1EM/PickMe';
         const latestReleaseUrl = `${repoUrl}/releases/latest`;
-        title = "You're using the web version";
+        title = "你正在使用网页版";
         content = `
-            <p>Welcome! You're currently using the <span class="first-visit-highlight">web version</span>.</p>
-            <p>Want to try the <a href="${latestReleaseUrl}" class="first-visit-link" target="_blank" rel="noopener noreferrer">client app</a>? It supports offline use, offers better security, and provides privacy protection.</p>
+            <p>欢迎！你当前使用的是<span class="first-visit-current">网页版</span>。</p>
+            <p>试试 <a href="${latestReleaseUrl}" class="first-visit-recommend" target="_blank" rel="noopener noreferrer">客户端</a> 吧？支持离线使用，安全性和隐私保护更佳。</p>
         `;
     }
     
@@ -4054,7 +4054,7 @@ function initFirstVisitPopup() {
                 ${content}
             </div>
             <div class="first-visit-footer">
-                <button class="first-visit-button" data-dismiss>Got it</button>
+                <button class="first-visit-button" data-dismiss>知道了</button>
             </div>
         </div>
     `;

@@ -1279,29 +1279,34 @@ body.modal-open { overflow: hidden; }
     margin-bottom: 0;
 }
 
-.first-visit-highlight {
+/* Current mode indicator - subtle */
+.first-visit-current {
+    color: rgba(221, 230, 255, 0.7);
+    font-weight: 400;
+}
+
+/* Recommended link - prominent with box styling */
+.first-visit-recommend {
     display: inline-block;
-    padding: 0.15rem 0.5rem;
-    background: rgba(78, 205, 255, 0.12);
-    border: 1px solid rgba(78, 205, 255, 0.2);
-    border-radius: 6px;
-    color: rgba(78, 205, 255, 0.95);
-    font-weight: 500;
+    padding: 0.2rem 0.6rem;
+    background: linear-gradient(135deg, rgba(78, 205, 255, 0.18), rgba(255, 74, 140, 0.15));
+    border: 1px solid rgba(78, 205, 255, 0.3);
+    border-radius: 8px;
+    color: rgba(78, 205, 255, 1);
+    text-decoration: none;
+    font-weight: 600;
     margin: 0 0.15rem;
     transform: rotate(-1deg);
+    transition: all 0.25s ease;
+    box-shadow: 0 2px 8px rgba(78, 205, 255, 0.15);
 }
 
-.first-visit-link {
-    color: rgba(78, 205, 255, 0.9);
-    text-decoration: none;
-    font-weight: 500;
-    border-bottom: 1px solid rgba(78, 205, 255, 0.3);
-    transition: all 0.2s ease;
-}
-
-.first-visit-link:hover {
+.first-visit-recommend:hover {
+    background: linear-gradient(135deg, rgba(78, 205, 255, 0.25), rgba(255, 74, 140, 0.22));
+    border-color: rgba(78, 205, 255, 0.5);
     color: rgba(78, 205, 255, 1);
-    border-bottom-color: rgba(78, 205, 255, 0.6);
+    transform: rotate(-1deg) translateY(-1px);
+    box-shadow: 0 4px 12px rgba(78, 205, 255, 0.25);
 }
 
 .first-visit-footer {
