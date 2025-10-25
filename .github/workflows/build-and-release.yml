@@ -3,31 +3,51 @@ name: Build & Release
 on:
   push:
     branches: [main]
-    tags:
-      - 'v*'
+    tags: ['v*']
   pull_request:
+    types: [opened, ready_for_review]
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - '.gitignore'
 
 env:
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
   PIP_NO_PYTHON_VERSION_WARNING: "1"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build-amd:
-    name: Build Windows (x86/x64)
-    runs-on: windows-latest
+  build:
+    name: Build Windows (${{ matrix.name }})
+    if: >
+      ${{
+        github.event_name != 'pull_request' ||
+        (github.event.action == 'opened' && !endsWith(github.actor, '[bot]')) ||
+        (github.event.action == 'ready_for_review')
+      }}
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86, x64]
+        include:
+          - { name: x86,   runner: windows-latest,  py_arch: x86,   triplet: win-py313-x86 }
+          - { name: x64,   runner: windows-latest,  py_arch: x64,   triplet: win-py313-x64 }
+          - { name: arm64, runner: windows-11-arm,  py_arch: arm64, triplet: win-py313-arm64 }
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.pull_request.number) || '' }}
 
-      - name: Setup Python 3.13 (${{ matrix.arch }})
+      - name: Setup Python 3.13 (${{ matrix.py_arch }})
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-          architecture: ${{ matrix.arch }}
+          architecture: ${{ matrix.py_arch }}
           cache: 'pip'
 
       - name: Install deps
@@ -48,60 +68,19 @@ jobs:
             --add-data "app/static;app/static" `
             --add-data "app/data;app/data"
 
-      - name: Upload artifact exe (PickMe-win-py313-${{ matrix.arch }})
+      - name: Upload artifact exe (PickMe-${{ matrix.triplet }})
         uses: actions/upload-artifact@v4
         with:
-          name: PickMe-win-py313-${{ matrix.arch }}
-          path: dist/PickMe.exe
-          if-no-files-found: error
-
-
-  build-arm64:
-    name: Build Windows (ARM64)
-    runs-on: windows-11-arm
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python 3.13 (arm64)
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-          architecture: 'arm64'
-          cache: 'pip'
-
-      - name: Install deps
-        shell: pwsh
-        run: |
-          python -m pip install --upgrade pip wheel
-          python -m pip install -r requirements.txt
-          python -m pip install pyinstaller
-
-      - name: Build (PyInstaller onefile GUI, ARM64)
-        shell: pwsh
-        run: |
-          if (Test-Path dist) { Remove-Item -Recurse -Force dist }
-          pyinstaller scripts/desktop.pyw --clean --onefile --noconsole `
-            --name PickMe `
-            --icon "icon.ico" `
-            --add-data "app/templates;app/templates" `
-            --add-data "app/static;app/static" `
-            --add-data "app/data;app/data"
-
-      - name: Upload artifact exe (PickMe-win-py313-arm64)
-        uses: actions/upload-artifact@v4
-        with:
-          name: PickMe-win-py313-arm64
+          name: PickMe-${{ matrix.triplet }}
           path: dist/PickMe.exe
           if-no-files-found: error
 
   release:
     name: Create GitHub Release
-    needs: [build-amd, build-arm64]
+    needs: [build]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    permissions: { contents: write }
     steps:
       - name: Download release artifacts only
         uses: actions/download-artifact@v4
