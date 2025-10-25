@@ -298,6 +298,10 @@ const RUNTIME_LABELS = {
     filesystem: "\u5ba2\u6237\u7aef",
 };
 const STORAGE_KEY = "pickme::payload";
+
+function isWebViewEnvironment() {
+    return !!window.pywebview || (navigator && /WebView|Edg\//.test(navigator.userAgent || ""));
+}
 const DEFAULT_CLASS_NAME = "默认班级";
 
 const state = {
@@ -2998,7 +3002,7 @@ async function exportDataInBrowser() {
     downloadBlob(blob, filename);
 }
 async function exportDataFromServer() {
-    const isWebView = !!window.pywebview || (navigator && /WebView|Edg\//.test(navigator.userAgent || ""));
+    const isWebView = isWebViewEnvironment();
     if (isWebView && window.pywebview?.api?.save_export) {
         let response;
         try {
@@ -4018,9 +4022,9 @@ function initFirstVisitPopup() {
         return;
     }
     
-    const isClientApp = !!window.pywebview || (navigator && /WebView|Edg\//.test(navigator.userAgent || ""));
+    const isClientApp = isWebViewEnvironment();
     
-    let title, content, linkUrl, linkText;
+    let title, content;
     
     if (isClientApp) {
         title = "You're using the client app";
