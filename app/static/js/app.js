@@ -298,6 +298,10 @@ const RUNTIME_LABELS = {
     filesystem: "\u5ba2\u6237\u7aef",
 };
 const STORAGE_KEY = "pickme::payload";
+
+function isWebViewEnvironment() {
+    return !!window.pywebview || (navigator && /WebView|Edg\//.test(navigator.userAgent || ""));
+}
 const DEFAULT_CLASS_NAME = "默认班级";
 
 const state = {
@@ -2998,7 +3002,7 @@ async function exportDataInBrowser() {
     downloadBlob(blob, filename);
 }
 async function exportDataFromServer() {
-    const isWebView = !!window.pywebview || (navigator && /WebView|Edg\//.test(navigator.userAgent || ""));
+    const isWebView = isWebViewEnvironment();
     if (isWebView && window.pywebview?.api?.save_export) {
         let response;
         try {
@@ -4010,4 +4014,108 @@ if (dom.backToTop) {
         });
     });
 }
+
+function initFirstVisitPopup() {
+    const STORAGE_KEY = 'pickme_first_visit_shown';
+    const isClientApp = isWebViewEnvironment();
+    
+    // Helper functions for persistence
+    async function hasBeenShown() {
+        if (isClientApp && window.pywebview?.api?.get_preference) {
+            try {
+                const result = await window.pywebview.api.get_preference(STORAGE_KEY);
+                return result?.ok && result?.value === true;
+            } catch {
+                return false;
+            }
+        } else {
+            return localStorage.getItem(STORAGE_KEY) === 'true';
+        }
+    }
+    
+    async function markAsShown() {
+        if (isClientApp && window.pywebview?.api?.set_preference) {
+            try {
+                await window.pywebview.api.set_preference(STORAGE_KEY, true);
+            } catch {
+                // Fallback to localStorage if API fails
+                localStorage.setItem(STORAGE_KEY, 'true');
+            }
+        } else {
+            localStorage.setItem(STORAGE_KEY, 'true');
+        }
+    }
+    
+    // Check if already shown
+    hasBeenShown().then(shown => {
+        if (shown) {
+            return;
+        }
+        
+        let title, content;
+        
+        if (isClientApp) {
+            title = "您正在使用客户端";
+            content = `
+                <p>您也可以试试 <a href="https://pickme.leever.cn" class="first-visit-recommend" target="_blank" rel="noopener noreferrer">网页版</a> 👈</p>
+                <p>性能开销更低，无需额外依赖~</p>
+            `;
+        } else {
+            const repoUrl = APP_META?.repository || 'https://github.com/KARPED1EM/PickMe';
+            const latestReleaseUrl = `${repoUrl}/releases/latest`;
+            title = "您正在使用网页版";
+            content = `
+                <p>您也可以试试 <a href="${latestReleaseUrl}" class="first-visit-recommend" target="_blank" rel="noopener noreferrer">客户端</a> 👈</p>
+                <p>支持离线使用，安全性和隐私保护更佳~</p>
+            `;
+        }
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'first-visit-overlay';
+        overlay.innerHTML = `
+            <div class="first-visit-modal">
+                <div class="first-visit-header">
+                    <div class="first-visit-icon">👋</div>
+                    <h2 class="first-visit-title">${title}</h2>
+                </div>
+                <div class="first-visit-content">
+                    ${content}
+                </div>
+                <div class="first-visit-footer">
+                    <button class="first-visit-button" data-dismiss>知道了</button>
+                </div>
+            </div>
+        `;
+        
+        const dismissButton = overlay.querySelector('[data-dismiss]');
+        dismissButton.addEventListener('click', () => {
+            markAsShown();
+            overlay.style.animation = 'fadeOut 0.3s ease-out forwards';
+            setTimeout(() => {
+                overlay.remove();
+            }, 300);
+        });
+        
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeOut {
+                to { opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        document.body.appendChild(overlay);
+        
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                dismissButton.click();
+            }
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(initFirstVisitPopup, 500);
+});
+
 
