@@ -297,7 +297,10 @@ const RUNTIME_LABELS = {
     browser: "\u7f51\u9875\u7248",
     filesystem: "\u5ba2\u6237\u7aef",
 };
-const STORAGE_KEY = "pickme::payload";
+
+// Storage keys for browser localStorage
+const STORAGE_KEY = "pickme::state";
+const PREFERENCES_KEY = "pickme::preferences";
 
 function isWebViewEnvironment() {
     return !!window.pywebview || (navigator && /WebView|Edg\//.test(navigator.userAgent || ""));
@@ -545,10 +548,13 @@ function applyAppState(rawState) {
             state.classData.set(classId, normalizePayload(payload));
         }
     });
-    const rawCurrent = normalized.current_class && typeof normalized.current_class === "object" ? normalized.current_class : {};
-    let payloadSource = rawCurrent.payload;
-    if (!payloadSource && state.classData.has(state.currentClassId)) {
+    // Prioritize classes_data over current_class.payload to avoid losing data during import
+    let payloadSource = null;
+    if (state.classData.has(state.currentClassId)) {
         payloadSource = state.classData.get(state.currentClassId);
+    } else {
+        const rawCurrent = normalized.current_class && typeof normalized.current_class === "object" ? normalized.current_class : {};
+        payloadSource = rawCurrent.payload;
     }
     state.payload = normalizePayload(payloadSource || {});
     state.classData.set(state.currentClassId, state.payload);
@@ -2925,6 +2931,15 @@ async function handleSettingsImportSelect(event) {
             const payload = await readImportFile(file);
             const validated = validateImportPayload(payload);
             applyAppState(validated);
+            // Defensive check: verify persistence was successful
+            if (USE_BROWSER_STORAGE) {
+                const stored = readStoredState();
+                if (!hasValidStoredState(stored)) {
+                    console.warn("Import succeeded but state was not persisted correctly");
+                    // Retry persistence
+                    persistState(state.app || validated);
+                }
+            }
             requestRender({ immediate: true });
             showToast("\u5bfc\u5165\u6210\u529f", "success");
             closeModal();
@@ -2993,6 +3008,38 @@ async function exportDataInBrowser() {
     const snapshot = createPersistableSnapshot();
     if (!snapshot) {
         throw new Error("\u6682\u65e0\u53ef\u5bfc\u51fa\u7684\u6570\u636e");
+    }
+    // Defensive check: ensure we have valid data to export
+    if (!snapshot.classes || !Array.isArray(snapshot.classes) || snapshot.classes.length === 0) {
+        console.warn("Export snapshot has no classes, regenerating from state");
+        // Try to rebuild snapshot from current state with validation
+        const currentClassId = state.currentClassId || "";
+        const currentClassName = state.currentClassName || "默认班级";
+        const currentPayload = state.payload || { cooldown_days: 3, students: [], generated_at: 0, history: { entries: [] } };
+        const classes = state.classes || [];
+        const classesData = state.classData ? Object.fromEntries(state.classData) : {};
+        
+        const rebuilt = {
+            version: state.app?.version || 1,
+            current_class_id: currentClassId,
+            current_class: {
+                id: currentClassId,
+                name: currentClassName,
+                payload: currentPayload
+            },
+            classes: classes,
+            classes_data: classesData
+        };
+        if (rebuilt.classes.length === 0) {
+            throw new Error("\u6682\u65e0\u53ef\u5bfc\u51fa\u7684\u6570\u636e");
+        }
+        state.app = rebuilt;
+        persistState(rebuilt);
+        const json = JSON.stringify(rebuilt, null, 2);
+        const blob = new Blob([json], { type: "application/json" });
+        const filename = generateDataFilename();
+        downloadBlob(blob, filename);
+        return;
     }
     state.app = snapshot;
     persistState(snapshot);
