@@ -528,10 +528,9 @@ def create_app(
             return error_response(translate_error(str(error)), status=404)
 
     @app.get("/preferences")
-    async def get_preferences(request: Request) -> JSONResponse:
-        """Get user preferences."""
-        data = await request_json(request)
-        prefs = preferences.load(data)
+    async def get_preferences() -> JSONResponse:
+        """Get user preferences (stored on client-side for browser mode)."""
+        prefs = preferences.load()
         return JSONResponse(prefs)
 
     @app.post("/preferences")
@@ -541,6 +540,16 @@ def create_app(
         prefs = data.get("preferences")
         if not isinstance(prefs, dict):
             return error_response("Invalid preferences data", status=400)
+        # Validate preferences keys and types
+        allowed_keys = {"theme", "language"}
+        for key in prefs.keys():
+            if key not in allowed_keys:
+                return error_response(f"Unknown preference key: {key}", status=400)
+        # Validate values
+        if "theme" in prefs and not isinstance(prefs["theme"], str):
+            return error_response("theme must be a string", status=400)
+        if "language" in prefs and not isinstance(prefs["language"], str):
+            return error_response("language must be a string", status=400)
         preferences.save(prefs)
         return JSONResponse({"message": "Preferences saved successfully"})
 

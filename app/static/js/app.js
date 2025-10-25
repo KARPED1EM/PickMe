@@ -3009,17 +3009,23 @@ async function exportDataInBrowser() {
     // Defensive check: ensure we have valid data to export
     if (!snapshot.classes || !Array.isArray(snapshot.classes) || snapshot.classes.length === 0) {
         console.warn("Export snapshot has no classes, regenerating from state");
-        // Try to rebuild snapshot from current state
+        // Try to rebuild snapshot from current state with validation
+        const currentClassId = state.currentClassId || "";
+        const currentClassName = state.currentClassName || "默认班级";
+        const currentPayload = state.payload || { cooldown_days: 3, students: [], generated_at: 0, history: { entries: [] } };
+        const classes = state.classes || [];
+        const classesData = state.classData ? Object.fromEntries(state.classData) : {};
+        
         const rebuilt = {
             version: state.app?.version || 1,
-            current_class_id: state.currentClassId,
+            current_class_id: currentClassId,
             current_class: {
-                id: state.currentClassId,
-                name: state.currentClassName,
-                payload: state.payload
+                id: currentClassId,
+                name: currentClassName,
+                payload: currentPayload
             },
-            classes: state.classes || [],
-            classes_data: Object.fromEntries(state.classData || new Map())
+            classes: classes,
+            classes_data: classesData
         };
         if (rebuilt.classes.length === 0) {
             throw new Error("\u6682\u65e0\u53ef\u5bfc\u51fa\u7684\u6570\u636e");
