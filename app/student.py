@@ -13,11 +13,15 @@ class Student:
         last_pick: float = 0.0,
         pick_count: int = 0,
         pick_history: list[float] | None = None,
-        student_id: str | None = None,
+        student_id: int | None = None,
         cooldown_started_at: float = 0.0,
         cooldown_expires_at: float = 0.0,
     ) -> None:
-        self.__id = (student_id or str(uuid.uuid4())).strip()
+        if student_id is None:
+            # Generate a random numeric ID if not provided
+            self.__id = abs(hash(uuid.uuid4())) % 1000000000
+        else:
+            self.__id = self.__parse_int(student_id)
         self.__name = name.strip()
         self.__group = max(0, self.__parse_int(group))
         self.__last_pick = float(last_pick or 0.0)
@@ -55,7 +59,7 @@ class Student:
             return 0.0
 
     @property
-    def student_id(self) -> str:
+    def student_id(self) -> int:
         return self.__id
 
     @property
@@ -90,8 +94,8 @@ class Student:
         self.__name = name.strip()
         self.__group = max(0, self.__parse_int(group))
 
-    def set_student_id(self, value: str) -> None:
-        self.__id = str(value or "").strip()
+    def set_student_id(self, value: int) -> None:
+        self.__id = self.__parse_int(value)
 
     def pickable(
         self, current_time: float, cooldown: int, ignore_cooldown: bool = False
@@ -205,6 +209,18 @@ class Student:
         except (TypeError, ValueError):
             pick_count_value = 0
         name_value = str(obj.get("name", "")).strip()
+        
+        # Parse student_id as int
+        student_id_value = None
+        raw_id = obj.get("id")
+        if raw_id is not None:
+            try:
+                # Handle both int and string representations
+                student_id_value = int(raw_id)
+            except (TypeError, ValueError):
+                # If conversion fails, let Student __init__ generate one
+                student_id_value = None
+        
         cooldown_started_at = obj.get("cooldown_started_at", 0.0)
         cooldown_expires_at = obj.get("cooldown_expires_at", 0.0)
         cooldown_payload = obj.get("cooldown")
@@ -220,7 +236,7 @@ class Student:
         elif "cooldown_started_at" in obj or "cooldown_expires_at" in obj:
             has_explicit_cooldown = True
         student = Student(
-            student_id=obj.get("id"),
+            student_id=student_id_value,
             name=name_value,
             group=group_value,
             last_pick=obj.get("last_pick", 0.0),

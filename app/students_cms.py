@@ -63,7 +63,12 @@ class DrawHistoryEntry:
         for item in candidates:
             if not isinstance(item, dict):
                 continue
-            student_id = str(item.get("id") or item.get("student_id") or "").strip()
+            # Parse student_id as int
+            raw_id = item.get("id") or item.get("student_id")
+            try:
+                student_id = int(raw_id) if raw_id is not None else 0
+            except (TypeError, ValueError):
+                student_id = 0
             name = str(item.get("name") or "").strip()
             try:
                 group_value = int(item.get("group", 0))
@@ -161,28 +166,24 @@ class StudentsCms:
     def add_student(self, student: Student) -> None:
         self.__students[student.student_id] = student
 
-    def generate_student_id(self) -> str:
+    def generate_student_id(self) -> int:
         numeric = [
-            int(student.student_id)
+            student.student_id
             for student in self.__students.values()
-            if str(student.student_id).isdigit()
         ]
         base = max(numeric) + 1 if numeric else 1
-        candidate = str(base)
-        while candidate in self.__students:
+        while base in self.__students:
             base += 1
-            candidate = str(base)
-        return candidate
+        return base
 
     def create_student(
-        self, name: str, group: int, student_id: str | None = None
+        self, name: str, group: int, student_id: int | None = None
     ) -> Student:
         name_value = str(name or "").strip()
         if not name_value:
             raise ValueError("name_required")
         group_value = self.__parse_int(group)
-        custom_id = str(student_id or "").strip()
-        new_id = custom_id or self.generate_student_id()
+        new_id = student_id if student_id is not None else self.generate_student_id()
         if new_id in self.__students:
             raise ValueError("id_exists")
         if self.student_name_exists(name_value):
@@ -191,19 +192,19 @@ class StudentsCms:
         self.add_student(student)
         return student
 
-    def remove_student(self, student_id: str) -> bool:
+    def remove_student(self, student_id: int) -> bool:
         return self.__students.pop(student_id, None) is not None
 
-    def student_name_exists(self, name: str, exclude_id: str | None = None) -> bool:
+    def student_name_exists(self, name: str, exclude_id: int | None = None) -> bool:
         lowered = name.lower()
         for student in self.__students.values():
-            if exclude_id and student.student_id == exclude_id:
+            if exclude_id is not None and student.student_id == exclude_id:
                 continue
             if student.name.lower() == lowered:
                 return True
         return False
 
-    def get_student_by_id(self, student_id: str) -> Student | None:
+    def get_student_by_id(self, student_id: int) -> Student | None:
         return self.__students.get(student_id)
 
     def get_students(self) -> list[Student]:
@@ -364,10 +365,10 @@ class StudentsCms:
 
     def update_student(
         self,
-        student_id: str,
+        student_id: int,
         name: str,
         group: int,
-        new_id: str | None = None,
+        new_id: int | None = None,
     ) -> Student:
         student = self.get_student_by_id(student_id)
         if not student:
@@ -379,12 +380,9 @@ class StudentsCms:
             raise ValueError("name_exists")
         target_id = student.student_id
         if new_id is not None:
-            candidate_id = str(new_id or "").strip()
-            if not candidate_id:
-                raise ValueError("id_required")
-            if candidate_id != student.student_id and candidate_id in self.__students:
+            if new_id != student.student_id and new_id in self.__students:
                 raise ValueError("id_exists")
-            target_id = candidate_id
+            target_id = new_id
         if target_id != student.student_id:
             self.__students.pop(student.student_id)
             student.set_student_id(target_id)

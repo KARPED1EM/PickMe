@@ -101,6 +101,16 @@ def create_app(
     def error_response(message: str, status: int = 400) -> JSONResponse:
         return JSONResponse(status_code=status, content={"message": message})
 
+    def parse_student_id(data: dict[str, Any], key: str = "student_id") -> int:
+        """Parse and validate student_id from request data."""
+        raw_id = data.get(key)
+        if raw_id is None:
+            raise ValueError("student_missing")
+        try:
+            return int(raw_id)
+        except (TypeError, ValueError):
+            raise ValueError("student_missing")
+
     def handle_set_cooldown(
         state: ClassroomsState, data: dict[str, Any]
     ) -> JSONResponse:
@@ -149,7 +159,14 @@ def create_app(
         cms = state.current_cms
         name = data.get("name")
         group = data.get("group")
-        student_id = data.get("student_id")
+        # Parse student_id if provided
+        student_id = None
+        raw_id = data.get("student_id")
+        if raw_id is not None:
+            try:
+                student_id = int(raw_id)
+            except (TypeError, ValueError):
+                raise ValueError("id_required")
         student = cms.create_student(name, group, student_id)
         return build_response(
             state,
@@ -166,9 +183,7 @@ def create_app(
         state: ClassroomsState, data: dict[str, Any]
     ) -> JSONResponse:
         cms = state.current_cms
-        student_id = str(data.get("student_id") or "").strip()
-        if not student_id:
-            raise ValueError("student_missing")
+        student_id = parse_student_id(data)
         if not cms.remove_student(student_id):
             raise KeyError("student_missing")
         return build_response(
@@ -186,12 +201,17 @@ def create_app(
         state: ClassroomsState, data: dict[str, Any]
     ) -> JSONResponse:
         cms = state.current_cms
-        student_id = str(data.get("student_id") or "").strip()
-        if not student_id:
-            raise ValueError("student_missing")
+        student_id = parse_student_id(data)
         name = data.get("name")
         group = data.get("group")
-        new_id = data.get("new_id")
+        # Parse new_id if provided
+        new_id = None
+        raw_new_id = data.get("new_id")
+        if raw_new_id is not None:
+            try:
+                new_id = int(raw_new_id)
+            except (TypeError, ValueError):
+                raise ValueError("id_required")
         student = cms.update_student(student_id, name, group, new_id)
         return build_response(
             state,
@@ -208,9 +228,7 @@ def create_app(
         state: ClassroomsState, data: dict[str, Any]
     ) -> JSONResponse:
         cms = state.current_cms
-        student_id = str(data.get("student_id") or "").strip()
-        if not student_id:
-            raise ValueError("student_missing")
+        student_id = parse_student_id(data)
         student = cms.get_student_by_id(student_id)
         if not student:
             raise KeyError("student_missing")
@@ -230,9 +248,7 @@ def create_app(
         state: ClassroomsState, data: dict[str, Any]
     ) -> JSONResponse:
         cms = state.current_cms
-        student_id = str(data.get("student_id") or "").strip()
-        if not student_id:
-            raise ValueError("student_missing")
+        student_id = parse_student_id(data)
         student = cms.get_student_by_id(student_id)
         if not student:
             raise KeyError("student_missing")
@@ -252,9 +268,7 @@ def create_app(
         state: ClassroomsState, data: dict[str, Any]
     ) -> JSONResponse:
         cms = state.current_cms
-        student_id = str(data.get("student_id") or "").strip()
-        if not student_id:
-            raise ValueError("student_missing")
+        student_id = parse_student_id(data)
         student = cms.get_student_by_id(student_id)
         if not student:
             raise KeyError("student_missing")
@@ -274,9 +288,7 @@ def create_app(
         state: ClassroomsState, data: dict[str, Any]
     ) -> JSONResponse:
         cms = state.current_cms
-        student_id = str(data.get("student_id") or "").strip()
-        if not student_id:
-            raise ValueError("student_missing")
+        student_id = parse_student_id(data)
         student = cms.get_student_by_id(student_id)
         if not student:
             raise KeyError("student_missing")

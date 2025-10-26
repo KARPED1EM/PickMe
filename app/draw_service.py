@@ -77,6 +77,7 @@ class DrawRequest:
 
 
 @dataclass
+@dataclass
 class DrawResult:
     mode: DrawMode
     class_id: str
@@ -84,7 +85,7 @@ class DrawResult:
     ignore_cooldown: bool
     requested_count: int
     history_entry: DrawHistoryEntry
-    pool_student_ids: list[str]
+    pool_student_ids: list[int]
     pool_groups: list[int]
     group_value: int | None = None
 
@@ -129,15 +130,7 @@ class DrawService:
     @staticmethod
     def _extract_numeric_ids(students: list[Student]) -> list[int]:
         """Extract numeric student IDs from a list of students."""
-        numeric_ids = []
-        for student in students:
-            if student.student_id.isdigit():
-                try:
-                    numeric_ids.append(int(student.student_id))
-                except (TypeError, ValueError):
-                    # Skip if conversion fails
-                    continue
-        return numeric_ids
+        return [student.student_id for student in students]
 
     def execute(
         self,
@@ -186,7 +179,7 @@ class DrawService:
             raise DrawError("no_students_available")
         
         # Find the chosen student
-        chosen = cms.get_student_by_id(str(selected_id))
+        chosen = cms.get_student_by_id(selected_id)
         if chosen is None:
             raise DrawError("no_students_available")
         
@@ -256,7 +249,7 @@ class DrawService:
                 raise DrawError("no_students_available")
             
             # Find the chosen student
-            student = cms.get_student_by_id(str(selected_id))
+            student = cms.get_student_by_id(selected_id)
             if student is None:
                 raise DrawError("no_students_available")
             
