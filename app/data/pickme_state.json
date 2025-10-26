@@ -19,7 +19,7 @@
       "id": "class-ithm",
       "name": "杭州黑马 AI Python 就业 3期",
       "order": 0,
-      "student_count": 76,
+      "student_count": 77,
       "cooldown_days": 3,
       "created_at": 0,
       "updated_at": 0,
@@ -641,16 +641,6 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "62",
-          "name": "杨耀森",
-          "group": 20,
-          "last_pick": 0.0,
-          "pick_count": 0,
-          "pick_history": [],
-          "cooldown_started_at": 0.0,
-          "cooldown_expires_at": 0.0
-        },
-        {
           "id": "63",
           "name": "周朝乐",
           "group": 12,
@@ -784,6 +774,26 @@
           "id": "76",
           "name": "程浩",
           "group": 3,
+          "last_pick": 0.0,
+          "pick_count": 0,
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
+        },
+        {
+          "id": "77",
+          "name": "吴军鹏",
+          "group": 10,
+          "last_pick": 0.0,
+          "pick_count": 0,
+          "pick_history": [],
+          "cooldown_started_at": 0.0,
+          "cooldown_expires_at": 0.0
+        },
+        {
+          "id": "78",
+          "name": "赵燕军",
+          "group": 16,
           "last_pick": 0.0,
           "pick_count": 0,
           "pick_history": [],
