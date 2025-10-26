@@ -2538,7 +2538,7 @@ function buildStudentModal(mode, student) {
           <div class="modal-body slim-scroll">
             <div class="mb-3">
               <label class="form-label">学号</label>
-              <input name="student_id" type="text" class="form-control" placeholder="留空将自动生成" autocomplete="off">
+              <input name="student_id" type="number" class="form-control" placeholder="留空将自动生成" autocomplete="off" min="1" step="1" inputmode="numeric">
             </div>
             <div class="mb-3">
               <label class="form-label">姓名</label>
@@ -2570,8 +2570,8 @@ function buildStudentModal(mode, student) {
           <div class="row g-3">
             <div class="col-12 col-md-3">
               <label class="form-label">学号</label>
-                <input name="student_id" type="text" class="form-control"
-                  value="${escapeHtml(student.id)}" autocomplete="off">
+                <input name="student_id" type="number" class="form-control"
+                  value="${escapeHtml(student.id)}" autocomplete="off" min="1" step="1" inputmode="numeric">
             </div>
             <div class="col-12 col-md-3">
               <label class="form-label">小组</label>
@@ -2637,7 +2637,7 @@ async function handleStudentFormSubmit(mode, context) {
     const idInput = context.idInput;
     const nameInput = context.nameInput;
     const groupInput = context.groupInput;
-    const idValue = idInput ? idInput.value.trim() : "";
+    const idValue = sanitizeStudentId(idInput ? idInput.value : "");
     const nameValue = nameInput.value.trim();
     if (!nameValue) {
         showToast("姓名不能为空", "warning");
@@ -2881,6 +2881,18 @@ function sanitizeGroup(value) {
         return 0;
     }
     return Math.max(0, Math.round(number));
+}
+
+function sanitizeStudentId(value) {
+    // Parse student_id as integer, return null if empty or invalid
+    if (!value || value.trim() === "") {
+        return null;
+    }
+    const number = Number(value);
+    if (!Number.isFinite(number) || number < 1) {
+        return null;
+    }
+    return Math.round(number);
 }
 
 function setBusy(value) {

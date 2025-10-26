@@ -31,7 +31,7 @@
       "cooldown_days": 3,
       "students": [
         {
-          "id": "1",
+          "id": 1,
           "name": "韩宜恒",
           "group": 4,
           "last_pick": 0.0,
@@ -41,7 +41,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "2",
+          "id": 2,
           "name": "李哲",
           "group": 4,
           "last_pick": 0.0,
@@ -51,7 +51,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "3",
+          "id": 3,
           "name": "闫瑞祥",
           "group": 19,
           "last_pick": 0.0,
@@ -61,7 +61,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "4",
+          "id": 4,
           "name": "袁执戈",
           "group": 17,
           "last_pick": 0.0,
@@ -71,7 +71,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "5",
+          "id": 5,
           "name": "越扬",
           "group": 17,
           "last_pick": 0.0,
@@ -81,7 +81,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "6",
+          "id": 6,
           "name": "王剑涛",
           "group": 6,
           "last_pick": 0.0,
@@ -91,7 +91,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "7",
+          "id": 7,
           "name": "段天博",
           "group": 16,
           "last_pick": 0.0,
@@ -101,7 +101,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "8",
+          "id": 8,
           "name": "徐俊豪",
           "group": 12,
           "last_pick": 0.0,
@@ -111,7 +111,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "9",
+          "id": 9,
           "name": "刘梦飞",
           "group": 12,
           "last_pick": 0.0,
@@ -121,7 +121,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "10",
+          "id": 10,
           "name": "陈鑫",
           "group": 17,
           "last_pick": 0.0,
@@ -131,7 +131,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "11",
+          "id": 11,
           "name": "席传鑫",
           "group": 18,
           "last_pick": 0.0,
@@ -141,7 +141,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "12",
+          "id": 12,
           "name": "黄程",
           "group": 12,
           "last_pick": 0.0,
@@ -151,7 +151,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "13",
+          "id": 13,
           "name": "李星蒴",
           "group": 7,
           "last_pick": 0.0,
@@ -161,7 +161,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "14",
+          "id": 14,
           "name": "王志博",
           "group": 18,
           "last_pick": 0.0,
@@ -171,7 +171,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "15",
+          "id": 15,
           "name": "姚佳良",
           "group": 14,
           "last_pick": 0.0,
@@ -181,7 +181,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "16",
+          "id": 16,
           "name": "周佳旺",
           "group": 1,
           "last_pick": 0.0,
@@ -191,7 +191,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "17",
+          "id": 17,
           "name": "刘海燕",
           "group": 1,
           "last_pick": 0.0,
@@ -201,7 +201,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "18",
+          "id": 18,
           "name": "史景麟",
           "group": 6,
           "last_pick": 0.0,
@@ -211,7 +211,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "19",
+          "id": 19,
           "name": "韩雨辰",
           "group": 13,
           "last_pick": 0.0,
@@ -221,7 +221,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "20",
+          "id": 20,
           "name": "王梅文",
           "group": 7,
           "last_pick": 0.0,
@@ -231,7 +231,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "21",
+          "id": 21,
           "name": "刘佳欣",
           "group": 1,
           "last_pick": 0.0,
@@ -241,7 +241,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "22",
+          "id": 22,
           "name": "张年",
           "group": 14,
           "last_pick": 0.0,
@@ -251,7 +251,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "23",
+          "id": 23,
           "name": "吕济发",
           "group": 18,
           "last_pick": 0.0,
@@ -261,7 +261,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "24",
+          "id": 24,
           "name": "汪建杰",
           "group": 15,
           "last_pick": 0.0,
@@ -271,7 +271,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "25",
+          "id": 25,
           "name": "冯炳栋",
           "group": 2,
           "last_pick": 0.0,
@@ -281,7 +281,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "26",
+          "id": 26,
           "name": "黄仲秋",
           "group": 14,
           "last_pick": 0.0,
@@ -291,7 +291,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "27",
+          "id": 27,
           "name": "宣智超",
           "group": 15,
           "last_pick": 0.0,
@@ -301,7 +301,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "28",
+          "id": 28,
           "name": "曾凡政",
           "group": 3,
           "last_pick": 0.0,
@@ -311,7 +311,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "29",
+          "id": 29,
           "name": "谢岩",
           "group": 10,
           "last_pick": 0.0,
@@ -321,7 +321,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "30",
+          "id": 30,
           "name": "莫林丛",
           "group": 13,
           "last_pick": 0.0,
@@ -331,7 +331,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "31",
+          "id": 31,
           "name": "吴冬凡",
           "group": 3,
           "last_pick": 0.0,
@@ -341,7 +341,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "32",
+          "id": 32,
           "name": "王生远",
           "group": 6,
           "last_pick": 0.0,
@@ -351,7 +351,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "33",
+          "id": 33,
           "name": "李建行",
           "group": 9,
           "last_pick": 0.0,
@@ -361,7 +361,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "34",
+          "id": 34,
           "name": "朱国栋",
           "group": 3,
           "last_pick": 0.0,
@@ -371,7 +371,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "35",
+          "id": 35,
           "name": "覃东",
           "group": 5,
           "last_pick": 0.0,
@@ -381,7 +381,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "36",
+          "id": 36,
           "name": "惠晨宇",
           "group": 9,
           "last_pick": 0.0,
@@ -391,7 +391,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "37",
+          "id": 37,
           "name": "朱磊",
           "group": 9,
           "last_pick": 0.0,
@@ -401,7 +401,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "38",
+          "id": 38,
           "name": "方启超",
           "group": 19,
           "last_pick": 0.0,
@@ -411,7 +411,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "39",
+          "id": 39,
           "name": "赵晟羽",
           "group": 1,
           "last_pick": 0.0,
@@ -421,7 +421,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "40",
+          "id": 40,
           "name": "赵明宽",
           "group": 11,
           "last_pick": 0.0,
@@ -431,7 +431,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "41",
+          "id": 41,
           "name": "戴佳乐",
           "group": 9,
           "last_pick": 0.0,
@@ -441,7 +441,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "42",
+          "id": 42,
           "name": "江文杰",
           "group": 10,
           "last_pick": 0.0,
@@ -451,7 +451,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "43",
+          "id": 43,
           "name": "陈维昊",
           "group": 12,
           "last_pick": 0.0,
@@ -461,7 +461,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "44",
+          "id": 44,
           "name": "曹杰",
           "group": 19,
           "last_pick": 0.0,
@@ -471,7 +471,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "45",
+          "id": 45,
           "name": "干雨琪",
           "group": 5,
           "last_pick": 0.0,
@@ -481,7 +481,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "46",
+          "id": 46,
           "name": "刘建成",
           "group": 7,
           "last_pick": 0.0,
@@ -491,7 +491,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "47",
+          "id": 47,
           "name": "杜文辉",
           "group": 11,
           "last_pick": 0.0,
@@ -501,7 +501,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "48",
+          "id": 48,
           "name": "郭炳清",
           "group": 2,
           "last_pick": 0.0,
@@ -511,7 +511,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "49",
+          "id": 49,
           "name": "粟嘉栋",
           "group": 10,
           "last_pick": 0.0,
@@ -521,7 +521,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "50",
+          "id": 50,
           "name": "郭思琦",
           "group": 13,
           "last_pick": 0.0,
@@ -531,7 +531,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "51",
+          "id": 51,
           "name": "周祎烁",
           "group": 17,
           "last_pick": 0.0,
@@ -541,7 +541,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "52",
+          "id": 52,
           "name": "王博",
           "group": 16,
           "last_pick": 0.0,
@@ -551,7 +551,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "53",
+          "id": 53,
           "name": "雷锦浩",
           "group": 15,
           "last_pick": 0.0,
@@ -561,7 +561,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "54",
+          "id": 54,
           "name": "曾宇宝",
           "group": 15,
           "last_pick": 0.0,
@@ -571,7 +571,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "55",
+          "id": 55,
           "name": "管中正",
           "group": 2,
           "last_pick": 0.0,
@@ -581,7 +581,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "56",
+          "id": 56,
           "name": "王留根",
           "group": 5,
           "last_pick": 0.0,
@@ -591,7 +591,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "57",
+          "id": 57,
           "name": "舒艾凌",
           "group": 8,
           "last_pick": 0.0,
@@ -601,7 +601,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "58",
+          "id": 58,
           "name": "楼飘豪",
           "group": 11,
           "last_pick": 0.0,
@@ -611,7 +611,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "59",
+          "id": 59,
           "name": "周谊华",
           "group": 8,
           "last_pick": 0.0,
@@ -621,7 +621,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "60",
+          "id": 60,
           "name": "王文洋",
           "group": 11,
           "last_pick": 0.0,
@@ -631,7 +631,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "61",
+          "id": 61,
           "name": "马学超",
           "group": 18,
           "last_pick": 0.0,
@@ -641,7 +641,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "63",
+          "id": 63,
           "name": "周朝乐",
           "group": 12,
           "last_pick": 0.0,
@@ -651,7 +651,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "64",
+          "id": 64,
           "name": "于成龙",
           "group": 10,
           "last_pick": 0.0,
@@ -661,7 +661,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "65",
+          "id": 65,
           "name": "王轩",
           "group": 13,
           "last_pick": 0.0,
@@ -671,7 +671,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "66",
+          "id": 66,
           "name": "孙塬东",
           "group": 17,
           "last_pick": 0.0,
@@ -681,7 +681,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "67",
+          "id": 67,
           "name": "王子赫",
           "group": 16,
           "last_pick": 0.0,
@@ -691,7 +691,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "68",
+          "id": 68,
           "name": "林贻胜",
           "group": 19,
           "last_pick": 0.0,
@@ -701,7 +701,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "69",
+          "id": 69,
           "name": "任明辉",
           "group": 2,
           "last_pick": 0.0,
@@ -711,7 +711,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "70",
+          "id": 70,
           "name": "张文开",
           "group": 8,
           "last_pick": 0.0,
@@ -721,7 +721,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "71",
+          "id": 71,
           "name": "侯国华",
           "group": 19,
           "last_pick": 0.0,
@@ -731,7 +731,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "72",
+          "id": 72,
           "name": "王一普",
           "group": 18,
           "last_pick": 0.0,
@@ -741,7 +741,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "73",
+          "id": 73,
           "name": "侯文浩",
           "group": 11,
           "last_pick": 0.0,
@@ -751,7 +751,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "74",
+          "id": 74,
           "name": "聂心雨",
           "group": 14,
           "last_pick": 0.0,
@@ -761,7 +761,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "75",
+          "id": 75,
           "name": "熊健",
           "group": 4,
           "last_pick": 0.0,
@@ -771,7 +771,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "76",
+          "id": 76,
           "name": "程浩",
           "group": 3,
           "last_pick": 0.0,
@@ -781,7 +781,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "77",
+          "id": 77,
           "name": "吴军鹏",
           "group": 10,
           "last_pick": 0.0,
@@ -791,7 +791,7 @@
           "cooldown_expires_at": 0.0
         },
         {
-          "id": "78",
+          "id": 78,
           "name": "赵燕军",
           "group": 16,
           "last_pick": 0.0,
