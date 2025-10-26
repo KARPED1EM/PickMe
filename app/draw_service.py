@@ -3,10 +3,12 @@ from __future__ import annotations
 import random
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from typing import Any, Iterable
 
 from .classrooms import ClassroomsState
+from .random_provider import get_today_random
 from .student import Student
 from .students_cms import DrawHistoryEntry, StudentsCms
 
@@ -115,6 +117,15 @@ class DrawService:
     def __init__(self, rng: random.Random | None = None) -> None:
         self._rng = rng or random.Random()
 
+    @staticmethod
+    def _is_different_day(timestamp1: float, timestamp2: float) -> bool:
+        """Check if two timestamps are from different days."""
+        if timestamp1 <= 0 or timestamp2 <= 0:
+            return True
+        date1 = datetime.fromtimestamp(timestamp1).date()
+        date2 = datetime.fromtimestamp(timestamp2).date()
+        return date1 != date2
+
     def execute(
         self,
         state: ClassroomsState,
@@ -140,7 +151,36 @@ class DrawService:
         pool = cms.eligible_students(ignore_cooldown=request.ignore_cooldown)
         if not pool:
             raise DrawError("no_students_available")
-        chosen = self._rng.choice(pool)
+        
+        # Prepare data for random_provider
+        all_students = cms.get_students()
+        all_student_ids = [int(s.student_id) for s in all_students if s.student_id.isdigit()]
+        disabled_ids = [
+            int(s.student_id) for s in all_students 
+            if s.student_id.isdigit() and s not in pool
+        ]
+        
+        # Get last selected info
+        last_selected_id, last_selected_time = cms.get_last_random_selected()
+        
+        # Check if last selection was from a different day
+        last_picked = last_selected_id
+        if last_selected_id is not None and self._is_different_day(last_selected_time, moment):
+            last_picked = None
+        
+        # Use random_provider to select
+        selected_id = get_today_random(all_student_ids, disabled_ids, last_picked)
+        if selected_id is None:
+            raise DrawError("no_students_available")
+        
+        # Find the chosen student
+        chosen = cms.get_student_by_id(str(selected_id))
+        if chosen is None:
+            raise DrawError("no_students_available")
+        
+        # Save the last selected number and time
+        cms.set_last_random_selected(selected_id, moment)
+        
         cms.register_random_pick([chosen], timestamp=moment)
         entry = cms.record_history_entry(
             DrawHistoryEntry(
@@ -176,7 +216,49 @@ class DrawService:
         count = self._normalize_batch_count(request.requested_count)
         if count > available:
             raise DrawError("batch_count_exceeds_available")
-        chosen = self._rng.sample(pool, count)
+        
+        # Prepare data for random_provider
+        all_students = cms.get_students()
+        all_student_ids = [int(s.student_id) for s in all_students if s.student_id.isdigit()]
+        
+        # Get last selected info (initial state)
+        last_selected_id, last_selected_time = cms.get_last_random_selected()
+        
+        # Check if last selection was from a different day
+        last_picked = last_selected_id
+        if last_selected_id is not None and self._is_different_day(last_selected_time, moment):
+            last_picked = None
+        
+        # Draw multiple students by calling random_provider multiple times
+        chosen = []
+        selected_ids = []
+        for _ in range(count):
+            # Build disabled list with students already chosen and those on cooldown
+            disabled_ids = [
+                int(s.student_id) for s in all_students 
+                if s.student_id.isdigit() and (s not in pool or s in chosen)
+            ]
+            
+            # Use random_provider to select
+            selected_id = get_today_random(all_student_ids, disabled_ids, last_picked)
+            if selected_id is None:
+                raise DrawError("no_students_available")
+            
+            # Find the chosen student
+            student = cms.get_student_by_id(str(selected_id))
+            if student is None:
+                raise DrawError("no_students_available")
+            
+            chosen.append(student)
+            selected_ids.append(selected_id)
+            
+            # Update last_picked for next iteration
+            last_picked = selected_id
+        
+        # Save the last selected number and time (after all selections)
+        if selected_ids:
+            cms.set_last_random_selected(selected_ids[-1], moment)
+        
         cms.register_random_pick(chosen, timestamp=moment)
         entry = cms.record_history_entry(
             DrawHistoryEntry(
@@ -207,7 +289,17 @@ class DrawService:
         groups = cms.eligible_groups(ignore_cooldown=request.ignore_cooldown)
         if not groups:
             raise DrawError("no_groups_available")
-        group_value = self._rng.choice(groups)
+        
+        # Use random_provider to select a group
+        # For groups, we pass a random number from the eligible groups as last_picked
+        # but we don't use or save the algorithm state
+        random_last_picked = self._rng.choice(groups) if groups else None
+        
+        selected_group = get_today_random(groups, [], random_last_picked)
+        if selected_group is None:
+            raise DrawError("no_groups_available")
+        
+        group_value = selected_group
         members = self._group_members(
             cms.get_students(),
             group_value,
@@ -217,6 +309,9 @@ class DrawService:
         )
         if not members:
             raise DrawError("no_students_available")
+        
+        # Note: We do NOT save last_selected_number or time for group draws
+        
         cms.register_random_pick(members, timestamp=moment)
         entry = cms.record_history_entry(
             DrawHistoryEntry(

@@ -135,6 +135,8 @@ class StudentsCms:
         self.__pick_cooldown = pick_cooldown
         self.__history: list[DrawHistoryEntry] = []
         self.__history_updated_at: float = time.time()
+        self.__last_random_selected_id: int | None = None
+        self.__last_random_selected_time: float = 0.0
 
     @staticmethod
     def __parse_int(value) -> int:
@@ -146,6 +148,15 @@ class StudentsCms:
     @property
     def pick_cooldown(self) -> int:
         return self.__pick_cooldown
+
+    def get_last_random_selected(self) -> tuple[int | None, float]:
+        """Get last random selected ID and timestamp for random algorithm."""
+        return self.__last_random_selected_id, self.__last_random_selected_time
+
+    def set_last_random_selected(self, student_id: int | None, timestamp: float) -> None:
+        """Set last random selected ID and timestamp for random algorithm."""
+        self.__last_random_selected_id = student_id
+        self.__last_random_selected_time = timestamp
 
     def add_student(self, student: Student) -> None:
         self.__students[student.student_id] = student
@@ -399,6 +410,8 @@ class StudentsCms:
             "cooldown_days": self.__pick_cooldown,
             "students": [student.serialize() for student in self.__students.values()],
             "history": self.export_history(),
+            "last_random_selected_id": self.__last_random_selected_id,
+            "last_random_selected_time": self.__last_random_selected_time,
         }
 
     def serialize(self) -> str:
@@ -422,14 +435,26 @@ class StudentsCms:
             raw = []
         history_payload = None
         if isinstance(raw, dict):
-            manager.__pick_cooldown = raw.get("cooldown_days", 3)
+            manager._StudentsCms__pick_cooldown = raw.get("cooldown_days", 3)
             students_data = raw.get("students", [])
             history_payload = raw.get("history")
+            # Load random algorithm state
+            last_id = raw.get("last_random_selected_id")
+            if last_id is not None:
+                try:
+                    manager._StudentsCms__last_random_selected_id = int(last_id)
+                except (TypeError, ValueError):
+                    manager._StudentsCms__last_random_selected_id = None
+            last_time = raw.get("last_random_selected_time", 0.0)
+            try:
+                manager._StudentsCms__last_random_selected_time = float(last_time)
+            except (TypeError, ValueError):
+                manager._StudentsCms__last_random_selected_time = 0.0
         else:
             students_data = raw
         for item in students_data:
             student = Student.deserialize(
-                item, default_cooldown_days=manager.__pick_cooldown
+                item, default_cooldown_days=manager._StudentsCms__pick_cooldown
             )
             manager.add_student(student)
         manager.load_history(history_payload)
