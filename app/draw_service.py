@@ -126,6 +126,19 @@ class DrawService:
         date2 = datetime.fromtimestamp(timestamp2).date()
         return date1 != date2
 
+    @staticmethod
+    def _extract_numeric_ids(students: list[Student]) -> list[int]:
+        """Extract numeric student IDs from a list of students."""
+        numeric_ids = []
+        for student in students:
+            if student.student_id.isdigit():
+                try:
+                    numeric_ids.append(int(student.student_id))
+                except (TypeError, ValueError):
+                    # Skip if conversion fails
+                    continue
+        return numeric_ids
+
     def execute(
         self,
         state: ClassroomsState,
@@ -154,11 +167,10 @@ class DrawService:
         
         # Prepare data for random_provider
         all_students = cms.get_students()
-        all_student_ids = [int(s.student_id) for s in all_students if s.student_id.isdigit()]
-        disabled_ids = [
-            int(s.student_id) for s in all_students 
-            if s.student_id.isdigit() and s not in pool
-        ]
+        all_student_ids = self._extract_numeric_ids(all_students)
+        disabled_ids = self._extract_numeric_ids(
+            [s for s in all_students if s not in pool]
+        )
         
         # Get last selected info
         last_selected_id, last_selected_time = cms.get_last_random_selected()
@@ -219,7 +231,7 @@ class DrawService:
         
         # Prepare data for random_provider
         all_students = cms.get_students()
-        all_student_ids = [int(s.student_id) for s in all_students if s.student_id.isdigit()]
+        all_student_ids = self._extract_numeric_ids(all_students)
         
         # Get last selected info (initial state)
         last_selected_id, last_selected_time = cms.get_last_random_selected()
@@ -234,10 +246,9 @@ class DrawService:
         selected_ids = []
         for _ in range(count):
             # Build disabled list with students already chosen and those on cooldown
-            disabled_ids = [
-                int(s.student_id) for s in all_students 
-                if s.student_id.isdigit() and (s not in pool or s in chosen)
-            ]
+            disabled_ids = self._extract_numeric_ids(
+                [s for s in all_students if s not in pool or s in chosen]
+            )
             
             # Use random_provider to select
             selected_id = get_today_random(all_student_ids, disabled_ids, last_picked)
@@ -293,7 +304,7 @@ class DrawService:
         # Use random_provider to select a group
         # For groups, we pass a random number from the eligible groups as last_picked
         # but we don't use or save the algorithm state
-        random_last_picked = self._rng.choice(groups) if groups else None
+        random_last_picked = self._rng.choice(groups)
         
         selected_group = get_today_random(groups, [], random_last_picked)
         if selected_group is None:

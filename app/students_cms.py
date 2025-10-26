@@ -435,7 +435,7 @@ class StudentsCms:
             raw = []
         history_payload = None
         if isinstance(raw, dict):
-            manager._StudentsCms__pick_cooldown = raw.get("cooldown_days", 3)
+            cooldown_days = raw.get("cooldown_days", 3)
             students_data = raw.get("students", [])
             history_payload = raw.get("history")
             # Load random algorithm state
@@ -452,9 +452,11 @@ class StudentsCms:
                 manager._StudentsCms__last_random_selected_time = 0.0
         else:
             students_data = raw
+            cooldown_days = 3
+        manager.set_pick_cooldown(cooldown_days)
         for item in students_data:
             student = Student.deserialize(
-                item, default_cooldown_days=manager._StudentsCms__pick_cooldown
+                item, default_cooldown_days=cooldown_days
             )
             manager.add_student(student)
         manager.load_history(history_payload)
