@@ -25,8 +25,6 @@ class Classroom:
     updated_at: float
     last_used_at: float
     order_index: int
-    algorithm_last_num: int | None = None
-    algorithm_last_time: float = 0.0
 
     def students_count(self) -> int:
         return len(self.cms.get_students())
@@ -41,8 +39,6 @@ class Classroom:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "last_used_at": self.last_used_at,
-            "algorithm_last_num": self.algorithm_last_num,
-            "algorithm_last_time": self.algorithm_last_time,
         }
 
     def to_payload(self) -> dict[str, Any]:
@@ -54,8 +50,6 @@ class Classroom:
             "last_used_at": self.last_used_at,
             "order": self.order_index,
             "data": self.cms.export(),
-            "algorithm_last_num": self.algorithm_last_num,
-            "algorithm_last_time": self.algorithm_last_time,
         }
 
 
@@ -198,8 +192,6 @@ class ClassroomsState:
                 "id": current_class.class_id,
                 "name": current_class.name,
                 "payload": current_class.cms.snapshot(snapshot_time),
-                "algorithm_last_num": current_class.algorithm_last_num,
-                "algorithm_last_time": current_class.algorithm_last_time,
             },
             "classes": classes_meta,
             "classes_data": classes_data,
@@ -297,29 +289,6 @@ class ClassroomsState:
             updated_at = cls._coerce_float(item.get("updated_at"), default=created_at)
             last_used_at = cls._coerce_float(item.get("last_used_at"), default=0.0)
             order_index = cls._coerce_int(item.get("order"), default=index)
-            
-            # Load algorithm fields
-            algorithm_last_num = None
-            raw_num = item.get("algorithm_last_num")
-            if raw_num is not None:
-                try:
-                    algorithm_last_num = int(raw_num)
-                except (TypeError, ValueError):
-                    algorithm_last_num = None
-            algorithm_last_time = cls._coerce_float(item.get("algorithm_last_time"), default=0.0)
-            
-            # Also check current_entry for algorithm fields if this is the current class
-            if str(current_entry.get("id") or "") == class_id:
-                if "algorithm_last_num" in current_entry:
-                    raw_num_current = current_entry.get("algorithm_last_num")
-                    if raw_num_current is not None:
-                        try:
-                            algorithm_last_num = int(raw_num_current)
-                        except (TypeError, ValueError):
-                            pass
-                if "algorithm_last_time" in current_entry:
-                    algorithm_last_time = cls._coerce_float(current_entry.get("algorithm_last_time"), default=algorithm_last_time)
-            
             data_blob = item.get("data")
             if data_blob is None:
                 data_blob = raw_classes_data.get(class_id)
@@ -334,8 +303,6 @@ class ClassroomsState:
                 updated_at=updated_at,
                 last_used_at=last_used_at,
                 order_index=order_index,
-                algorithm_last_num=algorithm_last_num,
-                algorithm_last_time=algorithm_last_time,
             )
         if not classes:
             return cls._default_state()

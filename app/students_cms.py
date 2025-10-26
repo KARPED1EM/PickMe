@@ -156,7 +156,10 @@ class StudentsCms:
         self.__students[student.student_id] = student
 
     def generate_student_id(self) -> int:
-        numeric = [student.student_id for student in self.__students.values()]
+        numeric = [
+            student.student_id
+            for student in self.__students.values()
+        ]
         base = max(numeric) + 1 if numeric else 1
         while base in self.__students:
             base += 1
@@ -300,7 +303,7 @@ class StudentsCms:
                 -student.pick_count,
                 student.group,
                 student.name.lower(),
-                student.student_id,
+                student.student_id.lower(),
             ),
         )
 
@@ -417,14 +420,14 @@ class StudentsCms:
             raw = []
         history_payload = None
         if isinstance(raw, dict):
-            manager._StudentsCms__pick_cooldown = raw.get("cooldown_days", 3)
+            manager.__pick_cooldown = raw.get("cooldown_days", 3)
             students_data = raw.get("students", [])
             history_payload = raw.get("history")
         else:
             students_data = raw
         for item in students_data:
             student = Student.deserialize(
-                item, default_cooldown_days=manager._StudentsCms__pick_cooldown
+                item, default_cooldown_days=manager.__pick_cooldown
             )
             manager.add_student(student)
         manager.load_history(history_payload)
