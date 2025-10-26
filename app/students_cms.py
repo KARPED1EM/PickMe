@@ -156,10 +156,7 @@ class StudentsCms:
         self.__students[student.student_id] = student
 
     def generate_student_id(self) -> int:
-        numeric = [
-            student.student_id
-            for student in self.__students.values()
-        ]
+        numeric = [student.student_id for student in self.__students.values()]
         base = max(numeric) + 1 if numeric else 1
         while base in self.__students:
             base += 1
@@ -303,7 +300,7 @@ class StudentsCms:
                 -student.pick_count,
                 student.group,
                 student.name.lower(),
-                student.student_id.lower(),
+                student.student_id,
             ),
         )
 

@@ -209,7 +209,7 @@ class Student:
         except (TypeError, ValueError):
             pick_count_value = 0
         name_value = str(obj.get("name", "")).strip()
-        
+
         # Parse student_id as int
         student_id_value = None
         raw_id = obj.get("id")
@@ -220,7 +220,7 @@ class Student:
             except (TypeError, ValueError):
                 # If conversion fails, let Student __init__ generate one
                 student_id_value = None
-        
+
         cooldown_started_at = obj.get("cooldown_started_at", 0.0)
         cooldown_expires_at = obj.get("cooldown_expires_at", 0.0)
         cooldown_payload = obj.get("cooldown")
