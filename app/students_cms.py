@@ -140,8 +140,6 @@ class StudentsCms:
         self.__pick_cooldown = pick_cooldown
         self.__history: list[DrawHistoryEntry] = []
         self.__history_updated_at: float = time.time()
-        self.__algorithm_last_num: int | None = None
-        self.__algorithm_last_time: float = 0.0
 
     @staticmethod
     def __parse_int(value) -> int:
@@ -153,15 +151,6 @@ class StudentsCms:
     @property
     def pick_cooldown(self) -> int:
         return self.__pick_cooldown
-
-    def get_last_random_selected(self) -> tuple[int | None, float]:
-        """Get last random selected ID and timestamp for random algorithm."""
-        return self.__algorithm_last_num, self.__algorithm_last_time
-
-    def set_last_random_selected(self, student_id: int | None, timestamp: float) -> None:
-        """Set last random selected ID and timestamp for random algorithm."""
-        self.__algorithm_last_num = student_id
-        self.__algorithm_last_time = timestamp
 
     def add_student(self, student: Student) -> None:
         self.__students[student.student_id] = student
@@ -401,8 +390,6 @@ class StudentsCms:
             "students": items,
             "generated_at": current_time,
             "history": self.export_history(),
-            "algorithm_last_num": self.__algorithm_last_num,
-            "algorithm_last_time": self.__algorithm_last_time,
         }
 
     def export(self) -> dict:
@@ -410,8 +397,6 @@ class StudentsCms:
             "cooldown_days": self.__pick_cooldown,
             "students": [student.serialize() for student in self.__students.values()],
             "history": self.export_history(),
-            "algorithm_last_num": self.__algorithm_last_num,
-            "algorithm_last_time": self.__algorithm_last_time,
         }
 
     def serialize(self) -> str:
@@ -438,18 +423,6 @@ class StudentsCms:
             manager._StudentsCms__pick_cooldown = raw.get("cooldown_days", 3)
             students_data = raw.get("students", [])
             history_payload = raw.get("history")
-            # Load random algorithm state
-            last_num = raw.get("algorithm_last_num")
-            if last_num is not None:
-                try:
-                    manager._StudentsCms__algorithm_last_num = int(last_num)
-                except (TypeError, ValueError):
-                    manager._StudentsCms__algorithm_last_num = None
-            last_time = raw.get("algorithm_last_time", 0.0)
-            try:
-                manager._StudentsCms__algorithm_last_time = float(last_time)
-            except (TypeError, ValueError):
-                manager._StudentsCms__algorithm_last_time = 0.0
         else:
             students_data = raw
         for item in students_data:

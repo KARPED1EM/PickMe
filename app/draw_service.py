@@ -165,8 +165,10 @@ class DrawService:
             [s for s in all_students if s not in pool]
         )
         
-        # Get last selected info
-        last_selected_id, last_selected_time = cms.get_last_random_selected()
+        # Get last selected info from classroom (not cms)
+        classroom = state.current_class
+        last_selected_id = classroom.algorithm_last_num
+        last_selected_time = classroom.algorithm_last_time
         
         # Check if last selection was from a different day
         last_picked = last_selected_id
@@ -183,8 +185,9 @@ class DrawService:
         if chosen is None:
             raise DrawError("no_students_available")
         
-        # Save the last selected number and time
-        cms.set_last_random_selected(selected_id, moment)
+        # Save the last selected number and time to classroom
+        classroom.algorithm_last_num = selected_id
+        classroom.algorithm_last_time = moment
         
         cms.register_random_pick([chosen], timestamp=moment)
         entry = cms.record_history_entry(
@@ -226,8 +229,10 @@ class DrawService:
         all_students = cms.get_students()
         all_student_ids = self._extract_numeric_ids(all_students)
         
-        # Get last selected info (initial state)
-        last_selected_id, last_selected_time = cms.get_last_random_selected()
+        # Get last selected info from classroom (initial state)
+        classroom = state.current_class
+        last_selected_id = classroom.algorithm_last_num
+        last_selected_time = classroom.algorithm_last_time
         
         # Check if last selection was from a different day
         last_picked = last_selected_id
@@ -259,9 +264,10 @@ class DrawService:
             # Update last_picked for next iteration
             last_picked = selected_id
         
-        # Save the last selected number and time (after all selections)
+        # Save the last selected number and time to classroom (after all selections)
         if selected_ids:
-            cms.set_last_random_selected(selected_ids[-1], moment)
+            classroom.algorithm_last_num = selected_ids[-1]
+            classroom.algorithm_last_time = moment
         
         cms.register_random_pick(chosen, timestamp=moment)
         entry = cms.record_history_entry(
