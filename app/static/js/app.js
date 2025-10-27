@@ -294,8 +294,8 @@ const APP_RUNNING_ON_DESKTOP = window.__APP_STORAGE_MODE__ === "desktop";
 const STORAGE_LOCATION = window.__APP_STORAGE_LOCATION__ || "";
 const APP_META = window.__APP_META__ && typeof window.__APP_META__ === "object" ? window.__APP_META__ : {};
 const RUNTIME_LABELS = {
-    server: "\u7f51\u9875\u7248",
-    desktop: "\u5ba2\u6237\u7aef",
+    server: "网页版",
+    desktop: "客户端",
 };
 
 // Storage keys for browser localStorage
@@ -1239,42 +1239,42 @@ function buildSettingsModal() {
     const appLicense = escapeHtml(String(meta.license || "MIT License"));
     const repositoryValue = typeof meta.repository === "string" ? meta.repository.trim() : "";
     const repositoryLink = repositoryValue
-        ? `<a class="settings-chip-link" href="${escapeHtml(repositoryValue)}" target="_blank" rel="noopener noreferrer">\u8bbf\u95ee\u4ed3\u5e93</a>`
-        : '<span class="settings-chip is-muted">\u6682\u65e0</span>';
-    const runtimeLabel = escapeHtml(RUNTIME_LABELS[APP_STORAGE_MODE] || "\u5ba2\u6237\u7aef");
-    const locationHint = STORAGE_LOCATION || (APP_RUNNING_ON_DESKTOP ? "\u672a\u63d0\u4f9b" : "\u6d4f\u89c8\u5668 localStorage");
+        ? `<a class="settings-chip-link" href="${escapeHtml(repositoryValue)}" target="_blank" rel="noopener noreferrer">访问仓库</a>`
+        : '<span class="settings-chip is-muted">暂无</span>';
+    const runtimeLabel = escapeHtml(RUNTIME_LABELS[APP_STORAGE_MODE] || "客户端");
+    const locationHint = STORAGE_LOCATION || (APP_RUNNING_ON_DESKTOP ? "未提供" : "浏览器 localStorage");
     const locationValue = escapeHtml(locationHint);
     const locationTitle = escapeHtml(locationHint);
     return `
 <div class="modal-backdrop settings-modal-backdrop">
   <div class="modal-panel glass settings-modal">
     <div class="modal-header settings-modal-header">
-      <h2 class="modal-title">\u8bbe\u7f6e\u4e2d\u5fc3</h2>
-      <button type="button" class="btn btn-icon" data-modal-close aria-label="\u5173\u95ed">&times;</button>
+      <h2 class="modal-title">设置中心</h2>
+      <button type="button" class="btn btn-icon" data-modal-close aria-label="关闭">&times;</button>
     </div>
     <div class="modal-body slim-scroll settings-modal-body">
       <div class="settings-grid">
         <section class="settings-card settings-about-card">
-          <h3 class="settings-card-title">\u8f6f\u4ef6\u4fe1\u606f</h3>
+          <h3 class="settings-card-title">软件信息</h3>
           <dl class="settings-data-grid">
             <div class="settings-data-row">
-              <dt>\u540d\u79f0</dt>
+              <dt>名称</dt>
               <dd>${appName}</dd>
             </div>
             <div class="settings-data-row">
-              <dt>\u7248\u672c</dt>
+              <dt>版本</dt>
               <dd>${appVersion}</dd>
             </div>
             <div class="settings-data-row">
-              <dt>\u8f6f\u4ef6\u73af\u5883</dt>
+              <dt>软件环境</dt>
               <dd>${runtimeLabel}</dd>
             </div>
             <div class="settings-data-row">
-              <dt>\u5f00\u53d1\u8005</dt>
+              <dt>开发者</dt>
               <dd>${appDeveloper}</dd>
             </div>
             <div class="settings-data-row">
-              <dt>\u5f00\u6e90\u534f\u8bae</dt>
+              <dt>开源协议</dt>
               <dd>${appLicense}</dd>
             </div>
             <div class="settings-data-row">
@@ -1284,15 +1284,15 @@ function buildSettingsModal() {
           </dl>
         </section>
         <section class="settings-card settings-runtime-card">
-          <h3 class="settings-card-title">\u7528\u6237\u6570\u636e</h3>
-          <p class="settings-description">\u5bfc\u5165 / \u5bfc\u51fa\u4f1a\u8986\u76d6\u5168\u90e8\u73ed\u7ea7\u3001\u5b66\u751f\u4e0e\u5386\u53f2\u8bb0\u5f55\uff0c\u9002\u7528\u4e8e\u8de8\u8bbe\u5907\u8fc1\u79fb\u6216\u5907\u4efd\u3002</p>
+          <h3 class="settings-card-title">用户数据</h3>
+          <p class="settings-description">导入 / 导出会覆盖全部班级、学生与历史记录，适用于跨设备迁移或备份。</p>
           <div class="settings-location-card" title="${locationTitle}">
-            <span class="settings-location-label">\u5f53\u524d\u6570\u636e\u8def\u5f84</span>
+            <span class="settings-location-label">当前数据路径</span>
             <span class="settings-location-value">${locationValue}</span>
           </div>
           <div class="settings-actions-row">
-            <button id="settings-export" type="button" class="btn btn-outline-light settings-action">\u5bfc\u51fa\u6570\u636e</button>
-            <button id="settings-import" type="button" class="btn btn-outline-light settings-action">\u5bfc\u5165\u6570\u636e</button>
+            <button id="settings-export" type="button" class="btn btn-outline-light settings-action">导出数据</button>
+            <button id="settings-import" type="button" class="btn btn-outline-light settings-action">导入数据</button>
           </div>
           <input id="settings-import-input" type="file" accept="application/json,.json" class="d-none">
         </section>
@@ -3086,9 +3086,9 @@ async function handleSettingsExport(event) {
     button.classList.add("is-busy");
     try {
         await exportDataFromServer();
-        showToast("\u5bfc\u51fa\u6210\u529f", "success");
+        showToast("导出成功", "success");
     } catch (error) {
-        const message = error && error.message ? error.message : "\u5bfc\u51fa\u5931\u8d25";
+        const message = error && error.message ? error.message : "导出失败";
         showToast(message, "error");
     } finally {
         button.disabled = false;
@@ -3114,10 +3114,10 @@ async function handleSettingsImportSelect(event) {
         busyManaged = true;
         await submitImportPayload(rawText);
         requestRender({ immediate: true });
-        showToast("\u5bfc\u5165\u6210\u529f", "success");
+        showToast("导入成功", "success");
         closeModal();
     } catch (error) {
-        const message = error && error.message ? error.message : "\u5bfc\u5165\u5931\u8d25";
+        const message = error && error.message ? error.message : "导入失败";
         showToast(message, "error");
     } finally {
         if (busyManaged) setBusy(false);
@@ -3133,17 +3133,17 @@ async function readImportFileAsText(file) {
     const text = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
-        reader.onerror = () => reject(new Error("\u6587\u4ef6\u8bfb\u53d6\u5931\u8d25"));
+        reader.onerror = () => reject(new Error("文件读取失败"));
         reader.readAsText(file, "utf-8");
     });
-    if (!text.trim()) throw new Error("\u5bfc\u5165\u6587\u4ef6\u4e3a\u7a7a");
+    if (!text.trim()) throw new Error("导入文件为空");
     return text;
 }
 
 async function submitImportPayload(payload) {
     const uuid = sessionStore.uuid;
     if (!uuid) {
-        throw new Error("\u6682\u65e0\u53ef\u66ff\u6362\u7684\u6570\u636e\u4f1a\u8bdd");
+        throw new Error("暂无可替换的数据会话");
     }
     let response;
     try {
@@ -3153,7 +3153,7 @@ async function submitImportPayload(payload) {
             body: JSON.stringify({ data: payload, uuid })
         });
     } catch {
-        throw new Error("\u5bfc\u5165\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5");
+        throw new Error("导入失败，请稍后重试");
     }
     let body = null;
     try {
@@ -3162,7 +3162,7 @@ async function submitImportPayload(payload) {
         body = null;
     }
     if (!response.ok) {
-        const message = body && body.message ? body.message : "\u5bfc\u5165\u5931\u8d25";
+        const message = body && body.message ? body.message : "导入失败";
         throw new Error(message);
     }
     if (body) {
@@ -3178,7 +3178,7 @@ async function exportDataFromServer() {
     const isWebView = isWebViewEnvironment();
     const uuid = sessionStore.uuid;
     if (!uuid) {
-        throw new Error("\u6682\u65e0\u53ef\u5bfc\u51fa\u7684\u6570\u636e");
+        throw new Error("暂无可导出的数据");
     }
     if (isWebView && window.pywebview?.api?.save_export) {
         let response;
@@ -3186,10 +3186,10 @@ async function exportDataFromServer() {
             const query = `?uuid=${encodeURIComponent(uuid)}`;
             response = await fetch(`/data/export${query}`);
         } catch {
-            throw new Error("\u5bfc\u51fa\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5");
+            throw new Error("导出失败，请稍后重试");
         }
         if (!response.ok) {
-            let message = "\u5bfc\u51fa\u5931\u8d25";
+            let message = "导出失败";
             try {
                 const data = await response.json();
                 if (data && data.message) message = data.message;
@@ -3200,7 +3200,7 @@ async function exportDataFromServer() {
         const suggested = parseContentDisposition(response.headers.get("Content-Disposition")) || generateDataFilename();
         const ret = await window.pywebview.api.save_export(text, suggested);
         if (!ret || ret.ok !== true) {
-            const msg = (ret && ret.message) ? ret.message : "\u4fdd\u5b58\u5931\u8d25";
+            const msg = (ret && ret.message) ? ret.message : "保存失败";
             throw new Error(msg);
         }
         return;
@@ -3210,10 +3210,10 @@ async function exportDataFromServer() {
         const query = `?uuid=${encodeURIComponent(uuid)}`;
         response = await fetch(`/data/export${query}`);
     } catch {
-        throw new Error("\u5bfc\u51fa\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5");
+        throw new Error("导出失败，请稍后重试");
     }
     if (!response.ok) {
-        let message = "\u5bfc\u51fa\u5931\u8d25";
+        let message = "导出失败";
         try {
             const data = await response.json();
             if (data && data.message) {
