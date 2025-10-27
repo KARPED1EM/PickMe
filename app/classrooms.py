@@ -378,12 +378,29 @@ class ClassroomsState:
                 algorithm = {}
             algorithm_data = dict(algorithm)
             students_blob = class_payload.get("students")
+            students_payload: list[dict[str, Any]] = []
             if isinstance(students_blob, dict):
-                students_payload = list(students_blob.values())
+                for student_key, student_entry in students_blob.items():
+                    if not isinstance(student_entry, dict):
+                        continue
+                    normalized_entry = dict(student_entry)
+                    if "id" not in normalized_entry:
+                        fallback = student_key
+                        if isinstance(fallback, str):
+                            fallback = fallback.strip()
+                        try:
+                            normalized_entry["id"] = int(fallback)
+                        except (TypeError, ValueError):
+                            normalized_entry["id"] = fallback
+                    students_payload.append(normalized_entry)
             elif isinstance(students_blob, list):
-                students_payload = students_blob
-            else:
-                students_payload = []
+                for student_entry in students_blob:
+                    if not isinstance(student_entry, dict):
+                        continue
+                    normalized_entry = dict(student_entry)
+                    if "id" not in normalized_entry and "student_id" in normalized_entry:
+                        normalized_entry["id"] = normalized_entry["student_id"]
+                    students_payload.append(normalized_entry)
             cms_payload = {
                 "cooldown_days": algorithm.get(
                     "cooldown_days", meta.get("cooldown_days", 3)

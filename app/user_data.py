@@ -141,7 +141,13 @@ def _now() -> float:
 def _default_unified_template() -> dict[str, Any]:
     students = {}
     for student_id, name, group in DEFAULT_STUDENTS:
-        students[student_id] = {
+        try:
+            numeric_id = int(student_id)
+        except (TypeError, ValueError):
+            numeric_id = None
+        entry_id = numeric_id if numeric_id is not None else str(student_id)
+        students[str(entry_id)] = {
+            "id": entry_id,
             "name": name,
             "group": group,
             "total_picked_count": 0,
