@@ -10,7 +10,6 @@ PickMe 是一款基于 FastAPI 与现代 Web 前端的随机点名工具，可�
 - 🗂️ **班级管理**：可创建、切换、删除班级，数据完全隔离，并支持拖拽调整显示顺序
 - 💾 **统一数据存储**：桌面模式为每位用户写入单一 JSON 文件，服务器模式为每位访客分配 UUID 并在后台写入用户目录下的 JSON 数据文件，同时浏览器仅保留最新的运行时缓存
 - 🪄 **交互友好**：右键快捷菜单、冷却队列、抽取历史等信息一目了然
-- 🧳 **一键打包**：提供 PyInstaller 配置，生成单文件 EXE 方便分发
 
 ## 平台支持
 
@@ -53,11 +52,7 @@ Windows 用户亦可执行 `scripts\serve.bat` 快速启动。
 ## 打包单文件 EXE
 
 ```bash
-pyinstaller scripts/desktop.pyw --clean --onefile --noconsole ^
-  --name PickMe ^
-  --icon icon.ico ^
-  --add-data "app/templates;app/templates" ^
-  --add-data "app/static;app/static"
+pyinstaller pickme.spec
 ```
 
 生成的可执行文件位于 `dist/PickMe.exe`。GitHub Actions 工作流 `.github/workflows/build-and-release.yml` 已配置 x86 / x64 / ARM64 多架构打包流程。

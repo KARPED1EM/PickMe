@@ -52,7 +52,6 @@ class AppServer(threading.Thread):
             access_log=False,
         )
         self._server = uvicorn.Server(self._config)
-        self._server.install_signal_handlers = False  # type: ignore
         self._shutdown_event = threading.Event()
 
     def run(self) -> None:

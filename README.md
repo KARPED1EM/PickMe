@@ -10,7 +10,6 @@ PickMe is a random name picker tool built with FastAPI and modern web frontend. 
 - 🗂️ **Classroom Management**: Create, switch, and delete classrooms with complete data isolation and drag-to-reorder support
 - 💾 **Unified Persistence**: Desktop mode writes a single JSON file per user; server mode keeps per-visitor UUID JSON files under the server data directory while the browser only caches the latest payload
 - 🪄 **User-Friendly Interface**: Context menus, cooldown queue, pick history, and more for easy interaction
-- 🧳 **One-Click Packaging**: PyInstaller configuration included for single-file EXE distribution
 
 ## Platform Support
 
@@ -53,11 +52,7 @@ Windows users can also run `scripts\serve.bat` for quick startup.
 ## Building Single-File EXE
 
 ```bash
-pyinstaller scripts/desktop.pyw --clean --onefile --noconsole ^
-  --name PickMe ^
-  --icon icon.ico ^
-  --add-data "app/templates;app/templates" ^
-  --add-data "app/static;app/static"
+pyinstaller pickme.spec
 ```
 
 The generated executable will be located at `dist/PickMe.exe`. The GitHub Actions workflow `.github/workflows/build-and-release.yml` is configured to build for x86, x64, and ARM64 architectures.

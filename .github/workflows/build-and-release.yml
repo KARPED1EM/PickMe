@@ -61,11 +61,7 @@ jobs:
         shell: pwsh
         run: |
           if (Test-Path dist) { Remove-Item -Recurse -Force dist }
-          pyinstaller scripts/desktop.pyw --clean --onefile --noconsole `
-            --name PickMe `
-            --icon "icon.ico" `
-            --add-data "app/templates;app/templates" `
-            --add-data "app/static;app/static"
+          pyinstaller pickme.spec
 
       - name: Upload artifact exe (PickMe-${{ matrix.triplet }})
         uses: actions/upload-artifact@v4
