@@ -1,14 +1,18 @@
 from __future__ import annotations
 
-import random
+import secrets
 import time
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Iterable
 
 from .classrooms import ClassroomsState
+from .random_provider import get_today_random
 from .student import Student
 from .students_cms import DrawHistoryEntry, StudentsCms
+
+ALGORITHM_LAST_NUM_KEY = "algorithm_last_num"
+ALGORITHM_LAST_TIME_KEY = "algorithm_last_time"
 
 
 class DrawError(Exception):
@@ -112,9 +116,6 @@ class DrawResult:
 
 
 class DrawService:
-    def __init__(self, rng: random.Random | None = None) -> None:
-        self._rng = rng or random.Random()
-
     def execute(
         self,
         state: ClassroomsState,
@@ -140,7 +141,13 @@ class DrawService:
         pool = cms.eligible_students(ignore_cooldown=request.ignore_cooldown)
         if not pool:
             raise DrawError("no_students_available")
-        chosen = self._rng.choice(pool)
+        classroom = state.current_class
+        chosen = self._pick_student(
+            classroom,
+            cms,
+            moment,
+            request.ignore_cooldown,
+        )
         cms.register_random_pick([chosen], timestamp=moment)
         entry = cms.record_history_entry(
             DrawHistoryEntry(
@@ -176,7 +183,19 @@ class DrawService:
         count = self._normalize_batch_count(request.requested_count)
         if count > available:
             raise DrawError("batch_count_exceeds_available")
-        chosen = self._rng.sample(pool, count)
+        classroom = state.current_class
+        chosen: list[Student] = []
+        selected_ids: set[int] = set()
+        for _ in range(count):
+            student = self._pick_student(
+                classroom,
+                cms,
+                moment,
+                request.ignore_cooldown,
+                selected_ids,
+            )
+            chosen.append(student)
+            selected_ids.add(student.student_id)
         cms.register_random_pick(chosen, timestamp=moment)
         entry = cms.record_history_entry(
             DrawHistoryEntry(
@@ -207,7 +226,11 @@ class DrawService:
         groups = cms.eligible_groups(ignore_cooldown=request.ignore_cooldown)
         if not groups:
             raise DrawError("no_groups_available")
-        group_value = self._rng.choice(groups)
+        candidates = [int(value) for value in groups]
+        placeholder = secrets.choice(candidates)
+        group_value = get_today_random(candidates, [], placeholder)
+        if group_value is None:
+            raise DrawError("no_groups_available")
         members = self._group_members(
             cms.get_students(),
             group_value,
@@ -264,3 +287,66 @@ class DrawService:
             if student.pickable(moment, cooldown_days, ignore_cooldown):
                 members.append(student)
         return members
+
+    @staticmethod
+    def _same_day(first: float, second: float) -> bool:
+        if first <= 0 or second <= 0:
+            return False
+        one = time.localtime(first)
+        two = time.localtime(second)
+        return one.tm_year == two.tm_year and one.tm_yday == two.tm_yday
+
+    def _resolve_last_pick(self, classroom, moment: float) -> int | None:
+        data = classroom.algorithm_data
+        last_num = data.get(ALGORITHM_LAST_NUM_KEY)
+        last_time = data.get(ALGORITHM_LAST_TIME_KEY)
+        try:
+            numeric = int(last_num)
+        except (TypeError, ValueError):
+            numeric = 0
+        try:
+            timestamp = float(last_time)
+        except (TypeError, ValueError):
+            timestamp = 0.0
+        if numeric <= 0:
+            return None
+        if not self._same_day(moment, timestamp):
+            return None
+        return numeric
+
+    @staticmethod
+    def _update_last_pick(classroom, student_id: int, moment: float) -> None:
+        data = classroom.algorithm_data
+        data[ALGORITHM_LAST_NUM_KEY] = int(student_id)
+        data[ALGORITHM_LAST_TIME_KEY] = float(moment)
+
+    def _pick_student(
+        self,
+        classroom,
+        cms: StudentsCms,
+        moment: float,
+        ignore_cooldown: bool,
+        extra_disabled: set[int] | None = None,
+    ) -> Student:
+        students = cms.get_students()
+        if not students:
+            raise DrawError("no_students_available")
+        lookup = {student.student_id: student for student in students}
+        items = list(lookup.keys())
+        disabled_set: set[int] = set(extra_disabled or ())
+        if not ignore_cooldown:
+            for student in students:
+                if not student.pickable(moment, cms.pick_cooldown, False):
+                    disabled_set.add(student.student_id)
+        disabled = list(disabled_set)
+        last_picked = self._resolve_last_pick(classroom, moment)
+        if last_picked is not None and last_picked not in lookup:
+            last_picked = None
+        chosen_id = get_today_random(items, disabled, last_picked)
+        if chosen_id is None:
+            raise DrawError("no_students_available")
+        student = lookup.get(chosen_id)
+        if student is None:
+            raise DrawError("no_students_available")
+        self._update_last_pick(classroom, student.student_id, moment)
+        return student

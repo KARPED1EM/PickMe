@@ -376,6 +376,7 @@ class ClassroomsState:
             algorithm = class_payload.get("algorithm_data")
             if not isinstance(algorithm, dict):
                 algorithm = {}
+            algorithm_data = dict(algorithm)
             students_blob = class_payload.get("students")
             if isinstance(students_blob, dict):
                 students_payload = list(students_blob.values())
@@ -391,7 +392,6 @@ class ClassroomsState:
                 "history": algorithm.get("history"),
             }
             cms = StudentsCms.deserialize(cms_payload)
-            algorithm_data = dict(algorithm)
             classroom = Classroom(
                 class_id=str(class_id),
                 name=str(meta.get("name") or DEFAULT_CLASS_NAME),
