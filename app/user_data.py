@@ -326,7 +326,7 @@ class UserData:
         """Create a new default user dataset."""
         unified = _default_unified_template()
         legacy = _unified_to_legacy(unified)
-        state = ClassroomsState.from_payload(legacy)
+        state = ClassroomsState.from_payload(unified, fallback=legacy)
         data = cls(
             user_id=user_id,
             classrooms=state,
@@ -362,7 +362,7 @@ class UserData:
         runtime = payload.get("runtime")
         metadata = payload.get("meta") or payload.get("metadata")
         legacy_payload = _unified_to_legacy(payload)
-        state = ClassroomsState.from_payload(legacy_payload)
+        state = ClassroomsState.from_payload(payload, fallback=legacy_payload)
         data = cls(
             user_id=user_id,
             classrooms=state,
