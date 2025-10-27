@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ctypes
+import datetime
 import logging
 import os
 import socket
@@ -11,24 +12,25 @@ from pathlib import Path
 import uvicorn
 import webview
 
+APP_RUN_MODE = "desktop"
+DEFAULT_APP_DATA_DIR = Path.home() / ".pickme"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app import create_app
-from app.paths import application_paths
 
 log = logging.getLogger("pickme.desktop")
 
-ALREADY_RUNNING_MESSAGE = "\u7a0b\u5e8f\u5df2\u7ecf\u5728\u8fd0\u884c\u3002\n\nApplication is already running."
-ALREADY_RUNNING_TITLE = "\u63d0\u793a | Notice"
+ALREADY_RUNNING_MESSAGE = "程序已经在运行。\n\nApplication is already running."
+ALREADY_RUNNING_TITLE = "提示 | Notice"
 WEBVIEW_MISSING_MESSAGE = (
-    "\u672a\u68c0\u6d4b\u5230 Microsoft Edge WebView2 \u8fd0\u884c\u65f6\n"
-    "\u662f\u5426\u6253\u5f00\u5b98\u65b9\u4e0b\u8f7d\u9875\u9762\uff1f\n\n"
+    "未检测到 Microsoft Edge WebView2 运行时。\n"
+    "是否打开官方下载页面？\n\n"
     "WebView2 Runtime is not installed.\n"
     "Open the official download page?"
 )
-WEBVIEW_MISSING_TITLE = "\u4f9d\u8d56\u7f3a\u5931 | Dependency Required"
+WEBVIEW_MISSING_TITLE = "依赖缺失 | Dependency Required"
 
 
 def find_free_port(host: str = "127.0.0.1") -> int:
@@ -50,7 +52,7 @@ class AppServer(threading.Thread):
             access_log=False,
         )
         self._server = uvicorn.Server(self._config)
-        self._server.install_signal_handlers = False
+        self._server.install_signal_handlers = False  # type: ignore
         self._shutdown_event = threading.Event()
 
     def run(self) -> None:
@@ -132,17 +134,14 @@ def main() -> None:
     if not webview2_installed():
         prompt_open_webview2_page_and_exit()
 
-    package_dir, default_data_dir, user_dir = application_paths()
-    log.info("Using user data directory: %s", user_dir)
-
-    app = create_app(user_dir, default_data_dir, storage_mode="filesystem")
+    app = create_app(DEFAULT_APP_DATA_DIR, APP_RUN_MODE)
     host = "127.0.0.1"
     port = find_free_port(host)
 
     server = AppServer(app, host, port)
     server.start()
 
-    api = DesktopApi(user_dir)
+    api = DesktopApi(DEFAULT_APP_DATA_DIR)
 
     window = webview.create_window(
         "Pick Me",
@@ -177,9 +176,7 @@ class DesktopApi:
     def save_export(self, data: str, suggested_filename: str | None = None):
         try:
             if not suggested_filename:
-                suggested_filename = (
-                    f"pickme-data-{time.strftime('%Y%m%d-%H%M%S')}.json"
-                )
+                suggested_filename = f"pickme-data-{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
 
             if self._window is None:
                 return {"ok": False, "message": "窗口未就绪"}
@@ -199,45 +196,7 @@ class DesktopApi:
                 f.write(data)
 
             return {"ok": True, "path": str(path)}
-        except Exception as e:  # noqa: BLE001
-            return {"ok": False, "message": str(e)}
-
-    def get_preference(self, key: str):
-        """Get a preference value from persistent storage."""
-        try:
-            prefs_file = self.user_dir / "preferences.json"
-            if not prefs_file.exists():
-                return {"ok": True, "value": None}
-            
-            import json
-            with open(prefs_file, "r", encoding="utf-8") as f:
-                prefs = json.load(f)
-            
-            return {"ok": True, "value": prefs.get(key)}
-        except Exception as e:  # noqa: BLE001
-            return {"ok": False, "message": str(e)}
-
-    def set_preference(self, key: str, value):
-        """Set a preference value in persistent storage."""
-        try:
-            import json
-            prefs_file = self.user_dir / "preferences.json"
-            
-            prefs = {}
-            if prefs_file.exists():
-                with open(prefs_file, "r", encoding="utf-8") as f:
-                    prefs = json.load(f)
-            
-            prefs[key] = value
-            
-            # Ensure directory exists
-            self.user_dir.mkdir(parents=True, exist_ok=True)
-            
-            with open(prefs_file, "w", encoding="utf-8") as f:
-                json.dump(prefs, f, ensure_ascii=False, indent=2)
-            
-            return {"ok": True}
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             return {"ok": False, "message": str(e)}
 
 

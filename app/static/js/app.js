@@ -289,18 +289,255 @@ function toFiniteNumber(value) {
     return Number.isFinite(number) ? number : null;
 }
 
-const STORAGE_MODE = window.__APP_STORAGE_MODE__ || "filesystem";
-const USE_BROWSER_STORAGE = STORAGE_MODE === "browser";
+const APP_STORAGE_MODE = window.__APP_STORAGE_MODE__ || "desktop";
+const APP_RUNNING_ON_DESKTOP = window.__APP_STORAGE_MODE__ === "desktop";
 const STORAGE_LOCATION = window.__APP_STORAGE_LOCATION__ || "";
 const APP_META = window.__APP_META__ && typeof window.__APP_META__ === "object" ? window.__APP_META__ : {};
 const RUNTIME_LABELS = {
-    browser: "\u7f51\u9875\u7248",
-    filesystem: "\u5ba2\u6237\u7aef",
+    server: "\u7f51\u9875\u7248",
+    desktop: "\u5ba2\u6237\u7aef",
 };
 
 // Storage keys for browser localStorage
-const STORAGE_KEY = "pickme::state";
-const PREFERENCES_KEY = "pickme::preferences";
+const PAYLOAD_STORAGE_KEY = "pickme::data";
+const UUID_STORAGE_KEY = "pickme::uuid";
+
+const sessionStore = (() => {
+    function safeParse(value) {
+        if (!value) return null;
+        try {
+            return JSON.parse(value);
+        } catch (error) {
+            console.warn("Failed to parse cached session payload", error);
+            return null;
+        }
+    }
+
+    return {
+        uuid: null,
+        data: null,
+        async initialize() {
+            const cachedUuid = this.loadUuid();
+            const cachedPayload = this.loadCachedData();
+            try {
+                localStorage.removeItem(PAYLOAD_STORAGE_KEY);
+            } catch (_) {}
+            try {
+                const response = await this.requestSession(cachedUuid);
+                this.uuid = response.uuid || cachedUuid || null;
+                this.data =
+                    response.data && typeof response.data === "object"
+                        ? response.data
+                        : {};
+                this.persist();
+            } catch (error) {
+                if (cachedPayload) {
+                    this.uuid = cachedUuid || null;
+                    this.data = cachedPayload;
+                    console.warn(
+                        "Session initialization failed, using cached data",
+                        error
+                    );
+                } else {
+                    throw error;
+                }
+            }
+        },
+        async requestSession(uuidCandidate) {
+            const payload = {};
+            if (!APP_RUNNING_ON_DESKTOP && uuidCandidate) {
+                payload.uuid = uuidCandidate;
+            }
+            const response = await fetch("/data/session", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const error = new Error(
+                    body.message || "Unable to establish data session"
+                );
+                error.status = response.status;
+                throw error;
+            }
+            return body;
+        },
+        loadUuid() {
+            if (APP_RUNNING_ON_DESKTOP) {
+                if (
+                    typeof window !== "undefined" &&
+                    window.__APP_INITIAL_UUID__
+                ) {
+                    const fallback = String(
+                        window.__APP_INITIAL_UUID__ || ""
+                    ).trim();
+                    return fallback || null;
+                }
+                return null;
+            }
+            try {
+                const stored = localStorage.getItem(UUID_STORAGE_KEY);
+                if (stored) {
+                    return stored;
+                }
+            } catch (error) {
+                console.warn("Failed to read cached UUID", error);
+            }
+            if (typeof window !== "undefined" && window.__APP_INITIAL_UUID__) {
+                const fallback = String(window.__APP_INITIAL_UUID__ || "").trim();
+                if (fallback) {
+                    return fallback;
+                }
+            }
+            return null;
+        },
+        saveUuid(uuid) {
+            if (APP_RUNNING_ON_DESKTOP || !uuid) {
+                return;
+            }
+            try {
+                localStorage.setItem(UUID_STORAGE_KEY, uuid);
+            } catch (error) {
+                console.warn("Failed to persist UUID", error);
+            }
+        },
+        loadCachedData() {
+            try {
+                const raw = localStorage.getItem(PAYLOAD_STORAGE_KEY);
+                return safeParse(raw);
+            } catch (error) {
+                console.warn("Failed to read cached session payload", error);
+                return null;
+            }
+        },
+        persist() {
+            if (!APP_RUNNING_ON_DESKTOP && this.uuid) {
+                this.saveUuid(this.uuid);
+            }
+            if (this.data) {
+                try {
+                    localStorage.setItem(
+                        PAYLOAD_STORAGE_KEY,
+                        JSON.stringify(this.data)
+                    );
+                } catch (error) {
+                    console.warn("Failed to persist session payload", error);
+                }
+            }
+        },
+        updateFromResponse(payload) {
+            if (!payload || typeof payload !== "object") {
+                return;
+            }
+            if (payload.uuid) {
+                this.uuid = payload.uuid;
+            }
+            if (payload.data && typeof payload.data === "object") {
+                this.data = payload.data;
+            }
+            this.persist();
+        },
+    };
+})();
+
+const preferenceStore = (() => {
+    const ALLOWED_KEYS = new Set([
+        "theme",
+        "language",
+        "dismissed_intro_popup",
+    ]);
+
+    function readAll() {
+        if (
+            sessionStore.data &&
+            typeof sessionStore.data === "object" &&
+            sessionStore.data.preferences &&
+            typeof sessionStore.data.preferences === "object"
+        ) {
+            return sessionStore.data.preferences;
+        }
+        return {};
+    }
+
+    function ensureContainer() {
+        if (!sessionStore.data || typeof sessionStore.data !== "object") {
+            sessionStore.data = {};
+        }
+        if (
+            !sessionStore.data.preferences ||
+            typeof sessionStore.data.preferences !== "object"
+        ) {
+            sessionStore.data.preferences = {};
+        }
+        return sessionStore.data.preferences;
+    }
+
+    return {
+        get(key, fallback = undefined) {
+            const prefs = readAll();
+            if (Object.prototype.hasOwnProperty.call(prefs, key)) {
+                return prefs[key];
+            }
+            return fallback;
+        },
+        all() {
+            return { ...readAll() };
+        },
+        async set(updates) {
+            if (!updates || typeof updates !== "object") {
+                return;
+            }
+            const sanitized = {};
+            for (const [key, value] of Object.entries(updates)) {
+                if (!ALLOWED_KEYS.has(key)) {
+                    continue;
+                }
+                sanitized[key] = value;
+            }
+            if (Object.keys(sanitized).length === 0) {
+                return;
+            }
+            const container = ensureContainer();
+            Object.assign(container, sanitized);
+            sessionStore.persist();
+            if (!sessionStore.uuid) {
+                return;
+            }
+            try {
+                const response = await fetch("/preferences", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        uuid: sessionStore.uuid,
+                        preferences: sanitized,
+                    }),
+                });
+                const body = await response.json().catch(() => ({}));
+                if (response.ok && body && typeof body.preferences === "object") {
+                    ensureContainer();
+                    sessionStore.data.preferences = body.preferences;
+                    sessionStore.persist();
+                } else if (!response.ok) {
+                    console.warn("Failed to persist preferences", body);
+                }
+            } catch (error) {
+                console.warn("Failed to save preferences", error);
+            }
+        },
+    };
+})();
+
+function renderInitializationError(error) {
+    console.error(error);
+    if (dom.resultNote) {
+        dom.resultNote.textContent = "Unable to load data, please refresh.";
+    }
+    if (dom.resultName) {
+        dom.resultName.textContent = "--";
+    }
+    showToast("Unable to load data, please refresh.", "error");
+}
 
 function isWebViewEnvironment() {
     return !!window.pywebview || (navigator && /WebView|Edg\//.test(navigator.userAgent || ""));
@@ -373,10 +610,16 @@ window.addEventListener("resize", () => {
         scheduleResultNameFit();
     }}, { passive: true });
 
-init();
+init().catch(renderInitializationError);
 
-function init() {
+async function init() {
     state.ignoreCooldown = dom.ignoreCooldown.checked;
+    try {
+        await sessionStore.initialize();
+    } catch (error) {
+        renderInitializationError(error);
+        return;
+    }
     const initialState = loadInitialState();
     applyAppState(initialState);
     bindEvents();
@@ -387,93 +630,14 @@ function init() {
 }
 
 function loadInitialState() {
-    const initial = window.__APP_INITIAL_DATA__ || {};
-    if (!USE_BROWSER_STORAGE) {
-        return initial;
-    }
-    const stored = readStoredState();
-    if (hasValidStoredState(stored)) {
-        return stored;
-    }
-    if (hasValidStoredState(initial)) {
-        persistState(initial);
-        return initial;
-    }
-    return initial;
+    const source = sessionStore.data && typeof sessionStore.data === "object"
+        ? sessionStore.data
+        : window.__APP_INITIAL_DATA__ || {};
+    return convertUnifiedToLegacy(source);
 }
 
-function readStoredState() {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) {
-            return null;
-        }
-        const parsed = JSON.parse(raw);
-        return parsed && typeof parsed === "object" ? parsed : null;
-    } catch (error) {
-        try {
-            localStorage.removeItem(STORAGE_KEY);
-        } catch {}
-        console.warn("读取浏览器存档失败", error);
-        return null;
-    }
-}
-
-function hasValidStoredState(candidate) {
-    if (!candidate || typeof candidate !== "object") {
-        return false;
-    }
-    if (Array.isArray(candidate.classes) && candidate.classes.length > 0) {
-        return true;
-    }
-    const current = candidate.current_class;
-    if (
-        current &&
-        typeof current === "object" &&
-        current.payload &&
-        typeof current.payload === "object" &&
-        Array.isArray(current.payload.students) &&
-        current.payload.students.length > 0
-    ) {
-        return true;
-    }
-    if (Array.isArray(candidate.students) && candidate.students.length > 0) {
-        return true;
-    }
-    return false;
-}
-
-function persistState(appState) {
-    if (!USE_BROWSER_STORAGE) {
-        return;
-    }
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
-    } catch (error) {
-        console.warn("写入浏览器存档失败", error);
-    }
-}
-
-function buildPersistableState(normalized) {
-    const classesData = {};
-    state.classData.forEach((payload, classId) => {
-        classesData[classId] = payload;
-    });
-    const classes = state.classes.map(item => ({
-        ...item,
-        data: classesData[item.id] || null
-    }));
-    return {
-        version: normalized.version,
-        current_class_id: state.currentClassId,
-        current_class: {
-            id: state.currentClassId,
-            name: state.currentClassName,
-            payload: state.payload
-        },
-        classes,
-        classes_data: classesData
-    };
+function persistState() {
+    sessionStore.persist();
 }
 
 function bindEvents() {
@@ -568,11 +732,21 @@ function applyAppState(rawState) {
     state.history = Array.isArray(historyData.entries) ? historyData.entries : [];
     state.historyIndex = new Map(state.history.map(entry => [entry.id, entry]));
     syncSelection();
-    const persistable = buildPersistableState(normalized);
-    state.app = persistable;
-    persistState(persistable);
+    sessionStore.data = convertLegacyToUnified(normalized);
+    state.app = sessionStore.data;
+    persistState();
     renderClassSwitcher();
     updateClassModal();
+}
+
+function applyServerState(response) {
+    if (!response || typeof response !== "object") {
+        return;
+    }
+    sessionStore.updateFromResponse(response);
+    const unified = sessionStore.data && typeof sessionStore.data === "object" ? sessionStore.data : {};
+    const legacy = convertUnifiedToLegacy(unified);
+    applyAppState(legacy);
 }
 
 function requestRender(options = {}) {
@@ -1067,8 +1241,8 @@ function buildSettingsModal() {
     const repositoryLink = repositoryValue
         ? `<a class="settings-chip-link" href="${escapeHtml(repositoryValue)}" target="_blank" rel="noopener noreferrer">\u8bbf\u95ee\u4ed3\u5e93</a>`
         : '<span class="settings-chip is-muted">\u6682\u65e0</span>';
-    const runtimeLabel = escapeHtml(RUNTIME_LABELS[STORAGE_MODE] || "\u5ba2\u6237\u7aef");
-    const locationHint = STORAGE_LOCATION || (USE_BROWSER_STORAGE ? "\u6d4f\u89c8\u5668 localStorage" : "\u672a\u63d0\u4f9b");
+    const runtimeLabel = escapeHtml(RUNTIME_LABELS[APP_STORAGE_MODE] || "\u5ba2\u6237\u7aef");
+    const locationHint = STORAGE_LOCATION || (APP_RUNNING_ON_DESKTOP ? "\u672a\u63d0\u4f9b" : "\u6d4f\u89c8\u5668 localStorage");
     const locationValue = escapeHtml(locationHint);
     const locationTitle = escapeHtml(locationHint);
     return `
@@ -1280,7 +1454,7 @@ async function handleClassSwitchRequest(classId) {
     setBusy(true);
     try {
         const response = await sendAction(ACTIONS.CLASS_SWITCH, { class_id: classId });
-        applyAppState(response.state);
+        applyServerState(response);
         requestRender();
         closeModal();
         showToast(`已切换至 ${state.currentClassName}`, "success");
@@ -1317,7 +1491,7 @@ async function handleClassDeleteRequest(classId) {
     setBusy(true);
     try {
         const response = await sendAction(ACTIONS.CLASS_DELETE, { class_id: classId });
-        applyAppState(response.state);
+        applyServerState(response);
         requestRender();
         showToast("班级已删除", "success");
     } catch (error) {
@@ -1415,7 +1589,7 @@ async function handleClassAddSubmit(event) {
     setBusy(true);
     try {
         const response = await sendAction(ACTIONS.CLASS_CREATE, { name });
-        applyAppState(response.state);
+        applyServerState(response);
         requestRender();
         showToast("班级已添加", "success");
         closeModal();
@@ -1436,7 +1610,7 @@ async function submitClassReorder(order) {
     setBusy(true);
     try {
         const response = await sendAction(ACTIONS.CLASS_REORDER, { order });
-        applyAppState(response.state);
+        applyServerState(response);
         requestRender();
         showToast("班级排序已更新", "success");
     } catch (error) {
@@ -1485,7 +1659,7 @@ async function handleCooldownSave(value) {
     setBusy(true);
     try {
         const response = await sendAction(ACTIONS.SET_COOLDOWN, { days: target });
-        applyAppState(response.state);
+        applyServerState(response);
         requestRender();
         showToast("冷却时间已更新", "success");
         closeModal();
@@ -1518,7 +1692,7 @@ async function handleClearCooldown() {
     setBusy(true);
     try {
         const response = await sendAction(ACTIONS.CLEAR_COOLDOWN);
-        applyAppState(response.state);
+        applyServerState(response);
         requestRender();
         showToast("冷却列表已清空", "success");
     } catch (error) {
@@ -1689,7 +1863,7 @@ async function runSimpleAction(action, payload, message) {
     setBusy(true);
     try {
         const response = await sendAction(action, payload);
-        applyAppState(response.state);
+        applyServerState(response);
         requestRender();
         if (message) {
             showToast(message, "success");
@@ -1855,7 +2029,7 @@ async function submitHistoryNote(entryId, note) {
     setBusy(true);
     try {
         const response = await sendAction(ACTIONS.HISTORY_NOTE, { entry_id: entryId, note });
-        applyAppState(response.state);
+        applyServerState(response);
         state.historyHighlightId = entryId;
         requestRender();
         closeModal();
@@ -1887,7 +2061,7 @@ async function handleHistoryDelete(entry) {
     setBusy(true);
     try {
         const response = await sendAction(ACTIONS.HISTORY_DELETE, { entry_id: entry.id });
-        applyAppState(response.state);
+        applyServerState(response);
         requestRender();
         showToast("已删除历史记录", "success");
     } catch (error) {
@@ -2364,7 +2538,7 @@ async function handleHistoryClear(studentId) {
     setBusy(true);
     try {
         const response = await sendAction(ACTIONS.STUDENT_HISTORY_CLEAR, { student_id: studentId });
-        applyAppState(response.state);
+        applyServerState(response);
         requestRender();
         showToast("已清空历史记录", "success");
     } catch (error) {
@@ -2384,7 +2558,7 @@ async function handleHistoryRemove(studentId, timestamp) {
     setBusy(true);
     try {
         const response = await sendAction(ACTIONS.STUDENT_HISTORY_REMOVE, { student_id: studentId, timestamp });
-        applyAppState(response.state);
+        applyServerState(response);
         requestRender();
         showToast("已删除记录", "success");
     } catch (error) {
@@ -2693,7 +2867,7 @@ async function submitStudentCreate(payload) {
     setBusy(true);
     try {
         const response = await sendAction(ACTIONS.STUDENT_CREATE, payload);
-        applyAppState(response.state);
+        applyServerState(response);
         requestRender();
         showToast("已添加学生", "success");
         closeModal();
@@ -2713,7 +2887,7 @@ async function submitStudentUpdate(payload) {
     setBusy(true);
     try {
         const response = await sendAction(ACTIONS.STUDENT_UPDATE, payload);
-        applyAppState(response.state);
+        applyServerState(response);
         requestRender();
         showToast("已保存修改", "success");
         closeModal();
@@ -2736,7 +2910,7 @@ async function handleStudentDelete(student) {
     setBusy(true);
     try {
         const response = await sendAction(ACTIONS.STUDENT_DELETE, { student_id: student.id });
-        applyAppState(response.state);
+        applyServerState(response);
         requestRender();
         showToast("已删除学生", "success");
         closeModal();
@@ -2768,7 +2942,7 @@ async function handleRandom(mode, extra = {}) {
         const result = response && typeof response === "object" ? response.result : null;
         const historyEntryId = result && result.history_entry_id ? String(result.history_entry_id) : "";
         await runSelectionAnimation(result);
-        applyAppState(response.state);
+        applyServerState(response);
         if (historyEntryId) {
             state.historyHighlightId = historyEntryId;
         }
@@ -2911,11 +3085,7 @@ async function handleSettingsExport(event) {
     button.disabled = true;
     button.classList.add("is-busy");
     try {
-        if (USE_BROWSER_STORAGE) {
-            await exportDataInBrowser();
-        } else {
-            await exportDataFromServer();
-        }
+        await exportDataFromServer();
         showToast("\u5bfc\u51fa\u6210\u529f", "success");
     } catch (error) {
         const message = error && error.message ? error.message : "\u5bfc\u51fa\u5931\u8d25";
@@ -2939,31 +3109,13 @@ async function handleSettingsImportSelect(event) {
     let busyManaged = false;
 
     try {
-        if (USE_BROWSER_STORAGE) {
-            const payload = await readImportFile(file);
-            const validated = validateImportPayload(payload);
-            applyAppState(validated);
-            // Defensive check: verify persistence was successful
-            if (USE_BROWSER_STORAGE) {
-                const stored = readStoredState();
-                if (!hasValidStoredState(stored)) {
-                    console.warn("Import succeeded but state was not persisted correctly");
-                    // Retry persistence
-                    persistState(state.app || validated);
-                }
-            }
-            requestRender({ immediate: true });
-            showToast("\u5bfc\u5165\u6210\u529f", "success");
-            closeModal();
-        } else {
-            const rawText = await readImportFileAsText(file);
-            setBusy(true);
-            busyManaged = true;
-            await submitImportPayload(rawText);
-            requestRender({ immediate: true });
-            showToast("\u5bfc\u5165\u6210\u529f", "success");
-            closeModal();
-        }
+        const rawText = await readImportFileAsText(file);
+        setBusy(true);
+        busyManaged = true;
+        await submitImportPayload(rawText);
+        requestRender({ immediate: true });
+        showToast("\u5bfc\u5165\u6210\u529f", "success");
+        closeModal();
     } catch (error) {
         const message = error && error.message ? error.message : "\u5bfc\u5165\u5931\u8d25";
         showToast(message, "error");
@@ -2989,17 +3141,20 @@ async function readImportFileAsText(file) {
 }
 
 async function submitImportPayload(payload) {
+    const uuid = sessionStore.uuid;
+    if (!uuid) {
+        throw new Error("\u6682\u65e0\u53ef\u66ff\u6362\u7684\u6570\u636e\u4f1a\u8bdd");
+    }
     let response;
     try {
         response = await fetch("/data/import", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ data: payload })
+            body: JSON.stringify({ data: payload, uuid })
         });
     } catch {
         throw new Error("\u5bfc\u5165\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5");
     }
-
     let body = null;
     try {
         body = await response.json();
@@ -3010,62 +3165,26 @@ async function submitImportPayload(payload) {
         const message = body && body.message ? body.message : "\u5bfc\u5165\u5931\u8d25";
         throw new Error(message);
     }
-    if (body && body.state) {
-        applyAppState(body.state);
+    if (body) {
+        applyServerState(body);
     }
 }
 
 
 async function exportDataInBrowser() {
-    const snapshot = createPersistableSnapshot();
-    if (!snapshot) {
-        throw new Error("\u6682\u65e0\u53ef\u5bfc\u51fa\u7684\u6570\u636e");
-    }
-    // Defensive check: ensure we have valid data to export
-    if (!snapshot.classes || !Array.isArray(snapshot.classes) || snapshot.classes.length === 0) {
-        console.warn("Export snapshot has no classes, regenerating from state");
-        // Try to rebuild snapshot from current state with validation
-        const currentClassId = state.currentClassId || "";
-        const currentClassName = state.currentClassName || "默认班级";
-        const currentPayload = state.payload || { cooldown_days: 3, students: [], generated_at: 0, history: { entries: [] } };
-        const classes = state.classes || [];
-        const classesData = state.classData ? Object.fromEntries(state.classData) : {};
-        
-        const rebuilt = {
-            version: state.app?.version || 1,
-            current_class_id: currentClassId,
-            current_class: {
-                id: currentClassId,
-                name: currentClassName,
-                payload: currentPayload
-            },
-            classes: classes,
-            classes_data: classesData
-        };
-        if (rebuilt.classes.length === 0) {
-            throw new Error("\u6682\u65e0\u53ef\u5bfc\u51fa\u7684\u6570\u636e");
-        }
-        state.app = rebuilt;
-        persistState(rebuilt);
-        const json = JSON.stringify(rebuilt, null, 2);
-        const blob = new Blob([json], { type: "application/json" });
-        const filename = generateDataFilename();
-        downloadBlob(blob, filename);
-        return;
-    }
-    state.app = snapshot;
-    persistState(snapshot);
-    const json = JSON.stringify(snapshot, null, 2);
-    const blob = new Blob([json], { type: "application/json" });
-    const filename = generateDataFilename();
-    downloadBlob(blob, filename);
+    return exportDataFromServer();
 }
 async function exportDataFromServer() {
     const isWebView = isWebViewEnvironment();
+    const uuid = sessionStore.uuid;
+    if (!uuid) {
+        throw new Error("\u6682\u65e0\u53ef\u5bfc\u51fa\u7684\u6570\u636e");
+    }
     if (isWebView && window.pywebview?.api?.save_export) {
         let response;
         try {
-            response = await fetch("/data/export");
+            const query = `?uuid=${encodeURIComponent(uuid)}`;
+            response = await fetch(`/data/export${query}`);
         } catch {
             throw new Error("\u5bfc\u51fa\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5");
         }
@@ -3088,7 +3207,8 @@ async function exportDataFromServer() {
     }
     let response;
     try {
-        response = await fetch("/data/export");
+        const query = `?uuid=${encodeURIComponent(uuid)}`;
+        response = await fetch(`/data/export${query}`);
     } catch {
         throw new Error("\u5bfc\u51fa\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5");
     }
@@ -3108,71 +3228,6 @@ async function exportDataFromServer() {
     const disposition = response.headers.get("Content-Disposition");
     const filename = parseContentDisposition(disposition) || generateDataFilename();
     downloadBlob(blob, filename);
-}
-
-async function submitImportPayload(payload) {
-    let response;
-    try {
-        response = await fetch("/data/import", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ data: payload })
-        });
-    } catch {
-        throw new Error("\u5bfc\u5165\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5");
-    }
-    let body = null;
-    try {
-        body = await response.json();
-    } catch {
-        body = null;
-    }
-    if (!response.ok) {
-        const message = body && body.message ? body.message : "\u5bfc\u5165\u5931\u8d25";
-        throw new Error(message);
-    }
-    if (body && body.state) {
-        applyAppState(body.state);
-    }
-}
-
-function validateImportPayload(payload) {
-    if (!payload || typeof payload !== "object") {
-        throw new Error("\u5bfc\u5165\u6587\u4ef6\u683c\u5f0f\u4e0d\u6b63\u786e");
-    }
-    if (!Array.isArray(payload.classes)) {
-        throw new Error("\u5bfc\u5165\u6587\u4ef6\u683c\u5f0f\u4e0d\u652f\u6301");
-    }
-    return payload;
-}
-
-function createPersistableSnapshot() {
-    const classesData = {};
-    state.classData.forEach((value, key) => {
-        classesData[key] = value;
-    });
-    const classesMeta = state.classes.map(item => ({
-        id: item.id,
-        name: item.name,
-        order: item.order,
-        student_count: item.student_count,
-        cooldown_days: item.cooldown_days,
-        created_at: item.created_at,
-        updated_at: item.updated_at,
-        last_used_at: item.last_used_at
-    }));
-    const normalized = {
-        version: state.app && Number.isFinite(Number(state.app.version)) ? Number(state.app.version) : 0,
-        current_class_id: state.currentClassId,
-        current_class: {
-            id: state.currentClassId,
-            name: state.currentClassName,
-            payload: state.payload
-        },
-        classes: classesMeta,
-        classes_data: classesData
-    };
-    return buildPersistableState(normalized);
 }
 
 function generateDataFilename(prefix = "pickme-data") {
@@ -3210,27 +3265,6 @@ function parseContentDisposition(value) {
         return asciiMatch[1];
     }
     return "";
-}
-
-async function readImportFile(file) {
-    const text = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-            resolve(typeof reader.result === "string" ? reader.result : "");
-        };
-        reader.onerror = () => {
-            reject(new Error("\u6587\u4ef6\u8bfb\u53d6\u5931\u8d25"));
-        };
-        reader.readAsText(file, "utf-8");
-    });
-    if (!text.trim()) {
-        throw new Error("\u5bfc\u5165\u6587\u4ef6\u4e3a\u7a7a");
-    }
-    try {
-        return JSON.parse(text);
-    } catch {
-        throw new Error("\u5bfc\u5165\u6587\u4ef6\u683c\u5f0f\u4e0d\u6b63\u786e");
-    }
 }
 
 function syncSelection() {
@@ -3277,8 +3311,8 @@ function getSortedStudents(students) {
 
 async function sendAction(action, data, options = {}) {
     const payload = { action, ...(data || {}) };
-    if (USE_BROWSER_STORAGE) {
-        payload.payload = state.app;
+    if (sessionStore.uuid) {
+        payload.uuid = sessionStore.uuid;
     }
     const { cancelPrevious = true, signal } = options;
     const controller = new AbortController();
@@ -3340,6 +3374,141 @@ async function sendAction(action, data, options = {}) {
 
 function isAbortError(error) {
     return !!(error && error.name === "AbortError");
+}
+
+function convertUnifiedToLegacy(source) {
+    if (!source || typeof source !== "object") {
+        return {};
+    }
+    if (Array.isArray(source.classes)) {
+        return source;
+    }
+    const classesSource = source.classes && typeof source.classes === "object" ? source.classes : {};
+    const runtime = source.runtime && typeof source.runtime === "object" ? source.runtime : {};
+    const classes = [];
+    const classesData = {};
+    const nowSeconds = Date.now() / 1000;
+    let orderCursor = 0;
+    for (const [classId, entry] of Object.entries(classesSource)) {
+        if (!classId || !entry || typeof entry !== "object") {
+            continue;
+        }
+        const meta = entry.meta && typeof entry.meta === "object" ? entry.meta : {};
+        const algorithm = entry.algorithm_data && typeof entry.algorithm_data === "object" ? entry.algorithm_data : {};
+        const studentSource = entry.students && typeof entry.students === "object" ? entry.students : {};
+        const students = [];
+        for (const [studentId, studentEntry] of Object.entries(studentSource)) {
+            if (!studentId || !studentEntry || typeof studentEntry !== "object") {
+                continue;
+            }
+            const history = Array.isArray(studentEntry.pick_history) ? studentEntry.pick_history.map(Number).filter(value => Number.isFinite(value)) : [];
+            const lastFromHistory = history.length ? history[history.length - 1] : 0;
+            students.push({
+                id: String(studentId),
+                name: String(studentEntry.name || ""),
+                group: Number(studentEntry.group) || 0,
+                last_pick: Number(studentEntry.last_picked_at ?? studentEntry.last_pick ?? lastFromHistory) || 0,
+                pick_count: Number(studentEntry.total_picked_count ?? studentEntry.pick_count ?? history.length) || history.length,
+                pick_history: history,
+                cooldown_started_at: Number(studentEntry.cooldown_started_at ?? 0) || 0,
+                cooldown_expires_at: Number(studentEntry.cooldown_expires_at ?? 0) || 0,
+            });
+        }
+        const cooldownDays = Number(algorithm.cooldown_days ?? meta.cooldown_days ?? meta.cooldown_duration ?? 3);
+        classesData[classId] = {
+            cooldown_days: Math.max(1, Number.isFinite(cooldownDays) ? cooldownDays : 3),
+            students,
+            history: algorithm.history && typeof algorithm.history === "object" ? algorithm.history : { entries: [] },
+            generated_at: nowSeconds,
+        };
+        const order = Number(meta.order);
+        classes.push({
+            id: classId,
+            name: String(meta.name || DEFAULT_CLASS_NAME),
+            order: Number.isFinite(order) ? order : orderCursor,
+            student_count: students.length,
+            cooldown_days: classesData[classId].cooldown_days,
+            created_at: Number(meta.created_at) || 0,
+            updated_at: Number(meta.updated_at) || 0,
+            last_used_at: Number(meta.last_used_at) || 0,
+        });
+        orderCursor += 1;
+    }
+    classes.sort((a, b) => a.order - b.order);
+    const currentId = runtime.active_class_id && classes.some(item => item.id === runtime.active_class_id)
+        ? runtime.active_class_id
+        : (classes[0] ? classes[0].id : "");
+    const currentMeta = classes.find(item => item.id === currentId) || classes[0] || null;
+    const currentPayload = currentMeta
+        ? classesData[currentMeta.id]
+        : { cooldown_days: 3, students: [], history: { entries: [] }, generated_at: nowSeconds };
+    return {
+        version: Number(source.version) || 0,
+        current_class_id: currentMeta ? currentMeta.id : "",
+        current_class: {
+            id: currentMeta ? currentMeta.id : "",
+            name: currentMeta ? currentMeta.name : DEFAULT_CLASS_NAME,
+            payload: currentPayload,
+        },
+        classes,
+        classes_data: classesData,
+    };
+}
+
+function convertLegacyToUnified(normalized) {
+    const source = normalized && typeof normalized === "object" ? normalized : {};
+    const preferences = sessionStore.data && typeof sessionStore.data === "object" && sessionStore.data.preferences
+        ? sessionStore.data.preferences
+        : {};
+    const result = {
+        version: Number(source.version) || 0,
+        preferences,
+        runtime: { active_class_id: source.current_class_id || "" },
+        classes: {},
+    };
+    const classesData = source.classes_data && typeof source.classes_data === "object" ? source.classes_data : {};
+    const classes = Array.isArray(source.classes) ? source.classes : [];
+    classes.forEach((meta, index) => {
+        if (!meta || typeof meta !== "object") {
+            return;
+        }
+        const classId = meta.id || `class-${index + 1}`;
+        const payload = classesData[classId] && typeof classesData[classId] === "object" ? classesData[classId] : {};
+        const studentsArray = Array.isArray(payload.students) ? payload.students : [];
+        const studentsMap = {};
+        studentsArray.forEach(student => {
+            if (!student || typeof student !== "object") {
+                return;
+            }
+            const pickHistory = Array.isArray(student.pick_history) ? student.pick_history : [];
+            const lastPick = Number(student.last_pick || (pickHistory.length ? pickHistory[pickHistory.length - 1] : 0)) || 0;
+            const pickCount = Number(student.pick_count ?? pickHistory.length) || pickHistory.length;
+            studentsMap[String(student.id || "")] = {
+                name: String(student.name || ""),
+                group: Number(student.group) || 0,
+                total_picked_count: pickCount,
+                last_picked_at: lastPick,
+                pick_history: pickHistory,
+                cooldown_started_at: Number(student.cooldown_started_at || 0) || 0,
+                cooldown_expires_at: Number(student.cooldown_expires_at || 0) || 0,
+            };
+        });
+        result.classes[classId] = {
+            meta: {
+                name: String(meta.name || DEFAULT_CLASS_NAME),
+                order: Number(meta.order) || index,
+                created_at: Number(meta.created_at) || 0,
+                updated_at: Number(meta.updated_at) || 0,
+                last_used_at: Number(meta.last_used_at) || 0,
+            },
+            algorithm_data: {
+                cooldown_days: Number(payload.cooldown_days ?? meta.cooldown_days ?? 3) || 3,
+                history: payload.history && typeof payload.history === "object" ? payload.history : { entries: [] },
+            },
+            students: studentsMap,
+        };
+    });
+    return result;
 }
 
 function normalizeAppState(raw) {
@@ -4075,36 +4244,18 @@ if (dom.backToTop) {
 }
 
 function initFirstVisitPopup() {
-    const STORAGE_KEY = 'pickme_first_visit_shown';
+    const PREFERENCE_KEY = "dismissed_intro_popup";
     const isClientApp = isWebViewEnvironment();
-    
+
     // Helper functions for persistence
     async function hasBeenShown() {
-        if (isClientApp && window.pywebview?.api?.get_preference) {
-            try {
-                const result = await window.pywebview.api.get_preference(STORAGE_KEY);
-                return result?.ok && result?.value === true;
-            } catch {
-                return false;
-            }
-        } else {
-            return localStorage.getItem(STORAGE_KEY) === 'true';
-        }
+        return preferenceStore.get(PREFERENCE_KEY, false) === true;
     }
-    
+
     async function markAsShown() {
-        if (isClientApp && window.pywebview?.api?.set_preference) {
-            try {
-                await window.pywebview.api.set_preference(STORAGE_KEY, true);
-            } catch {
-                // Fallback to localStorage if API fails
-                localStorage.setItem(STORAGE_KEY, 'true');
-            }
-        } else {
-            localStorage.setItem(STORAGE_KEY, 'true');
-        }
+        await preferenceStore.set({ [PREFERENCE_KEY]: true });
     }
-    
+
     // Check if already shown
     hasBeenShown().then(shown => {
         if (shown) {
@@ -4148,7 +4299,9 @@ function initFirstVisitPopup() {
         
         const dismissButton = overlay.querySelector('[data-dismiss]');
         dismissButton.addEventListener('click', () => {
-            markAsShown();
+            markAsShown().catch(error => {
+                console.warn("Failed to persist first visit preference", error);
+            });
             overlay.style.animation = 'fadeOut 0.3s ease-out forwards';
             setTimeout(() => {
                 overlay.remove();
@@ -4176,5 +4329,3 @@ function initFirstVisitPopup() {
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(initFirstVisitPopup, 500);
 });
-
-

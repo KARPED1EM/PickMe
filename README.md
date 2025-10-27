@@ -8,7 +8,7 @@ PickMe is a random name picker tool built with FastAPI and modern web frontend. 
 
 - 🎯 **Random Selection**: Pick individual students or groups with configurable cooldown periods to avoid frequent repetitions
 - 🗂️ **Classroom Management**: Create, switch, and delete classrooms with complete data isolation and drag-to-reorder support
-- 💾 **Multi-Platform Persistence**: Desktop mode writes to local user directory; server mode stores in browser `localStorage`
+- 💾 **Unified Persistence**: Desktop mode writes a single JSON file per user; server mode keeps per-visitor UUID JSON files under the server data directory while the browser only caches the latest payload
 - 🪄 **User-Friendly Interface**: Context menus, cooldown queue, pick history, and more for easy interaction
 - 🧳 **One-Click Packaging**: PyInstaller configuration included for single-file EXE distribution
 
@@ -34,12 +34,11 @@ On first launch, data files will be created in `%LOCALAPPDATA%\PickMe` and the W
 python -m scripts.serve --host 0.0.0.0 --port 8000
 ```
 
-By default, uses `browser` storage mode where each visitor's data is saved in their browser's `localStorage` independently. Available parameters:
+By default, uses `browser` storage mode where each visitor receives a UUID backed by a JSON file on the server (e.g. `<app-data-dir>/users/{uuid}.pickme.v2.json`). The browser keeps a short-lived cached payload locally for faster startup. Available parameters:
 
 | Parameter | Description |
 | ---- | ---- |
-| `--storage browser` | (Default) Persist data per client browser |
-| `--storage filesystem` | Write data to server directory, supports `--user-data-dir` for custom location |
+| `--app-data-dir` | Directory used to store application data. |
 | `--reload` | Enable FastAPI hot reload for development |
 
 Windows users can also run `scripts\serve.bat` for quick startup.
@@ -47,9 +46,9 @@ Windows users can also run `scripts\serve.bat` for quick startup.
 ## Classrooms & Data Storage
 
 - First run includes a default classroom **"杭州黑马 AI Python 就业 3期"** with sample student list for immediate testing.
-- **Desktop Mode**: All classroom data is saved to `%LOCALAPPDATA%\PickMe\pickme_state.json` in the current user's directory.
-- **Server Mode**: Data is saved to the visitor's browser `localStorage` by default; switching browsers or devices creates independent data copies.
-- Each classroom has its own student list, pick history, and cooldown state; data is automatically persisted when switching classrooms.
+- **Desktop Mode**: All data is stored in `%LOCALAPPDATA%\PickMe\local.pickme.v2.json`, a single unified JSON file that contains preferences, runtime state, classes, and students.
+- **Server Mode**: Each visitor receives a UUID on first load; the backend stores the unified JSON at `%LOCALAPPDATA%\PickMe\users/{uuid}.pickme.v2.json`. The browser keeps only a refreshed runtime cache (`pickme::uuid` and `pickme::data`) to stay in sync.
+- Each classroom keeps its student list, pick history, and cooldown state inside that unified file; updates persist automatically after every action.
 
 ## Building Single-File EXE
 
@@ -58,8 +57,7 @@ pyinstaller scripts/desktop.pyw --clean --onefile --noconsole ^
   --name PickMe ^
   --icon icon.ico ^
   --add-data "app/templates;app/templates" ^
-  --add-data "app/static;app/static" ^
-  --add-data "app/data;app/data"
+  --add-data "app/static;app/static"
 ```
 
 The generated executable will be located at `dist/PickMe.exe`. The GitHub Actions workflow `.github/workflows/build-and-release.yml` is configured to build for x86, x64, and ARM64 architectures.
@@ -70,6 +68,5 @@ The generated executable will be located at `dist/PickMe.exe`. The GitHub Action
 scripts/desktop.pyw       # WebView2 wrapper entry point (desktop mode)
 scripts/serve.py          # FastAPI server startup script
 app/                      # FastAPI application, templates, and static resources
-app/paths.py              # Runtime paths and user data directory locator
 app/metadata.py           # Application metadata
 ```

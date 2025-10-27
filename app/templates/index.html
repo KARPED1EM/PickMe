@@ -181,8 +181,9 @@
 <script>
     window.__APP_INITIAL_DATA__ = {{ initial_data|safe }};
     window.__APP_STORAGE_MODE__ = {{ storage_mode|tojson }};
-    window.__APP_STORAGE_LOCATION__ = {{ user_data_path|tojson }};
+    window.__APP_STORAGE_LOCATION__ = {{ storage_location|tojson }};
     window.__APP_META__ = {{ app_meta|tojson }};
+    window.__APP_INITIAL_UUID__ = {{ initial_uuid|tojson }};
 </script>
 <script src="{{ url_path_for('static', path='js/app.js') }}"></script>
 </body>

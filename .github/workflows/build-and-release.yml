@@ -65,8 +65,7 @@ jobs:
             --name PickMe `
             --icon "icon.ico" `
             --add-data "app/templates;app/templates" `
-            --add-data "app/static;app/static" `
-            --add-data "app/data;app/data"
+            --add-data "app/static;app/static"
 
       - name: Upload artifact exe (PickMe-${{ matrix.triplet }})
         uses: actions/upload-artifact@v4

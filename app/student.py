@@ -210,7 +210,6 @@ class Student:
             pick_count_value = 0
         name_value = str(obj.get("name", "")).strip()
 
-        # Parse student_id as int
         student_id_value = None
         raw_id = obj.get("id")
         if raw_id is not None:

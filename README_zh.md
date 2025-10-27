@@ -8,7 +8,7 @@ PickMe 是一款基于 FastAPI 与现代 Web 前端的随机点名工具，可�
 
 - 🎯 **随机抽取**：支持单人 / 小组随机抽取，冷却时间可配置，避免频繁重复点名
 - 🗂️ **班级管理**：可创建、切换、删除班级，数据完全隔离，并支持拖拽调整显示顺序
-- 💾 **多终端持久化**：桌面模式写入本地用户目录，服务器模式存入浏览器 `localStorage`
+- 💾 **统一数据存储**：桌面模式为每位用户写入单一 JSON 文件，服务器模式为每位访客分配 UUID 并在后台写入用户目录下的 JSON 数据文件，同时浏览器仅保留最新的运行时缓存
 - 🪄 **交互友好**：右键快捷菜单、冷却队列、抽取历史等信息一目了然
 - 🧳 **一键打包**：提供 PyInstaller 配置，生成单文件 EXE 方便分发
 
@@ -34,22 +34,21 @@ python scripts/desktop.pyw
 python -m scripts.serve --host 0.0.0.0 --port 8000
 ```
 
-默认使用 `browser` 存储模式，每位访问者的数据保存在其浏览器 `localStorage` 中，互不影响。也可指定参数：
+默认使用 `browser` 存储模式，为每位访客分配 UUID 并在服务器的用户数据目录（如 `<app-data-dir>/users/{uuid}.pickme.v2.json`）中持久化 JSON 文件。浏览器仅保留短期运行时缓存，以确保每次进入页面时都能刷新数据。也可指定参数：
 
 | 参数 | 说明 |
 | ---- | ---- |
-| `--storage browser` | （默认）按客户端浏览器持久化 |
-| `--storage filesystem` | 将数据写入服务器指定目录，支持 `--user-data-dir` 自定义位置 |
+| `--app-data-dir` | 存储应用数据的目录 |
 | `--reload` | 开发调试时启用 FastAPI 热重载 |
 
 Windows 用户亦可执行 `scripts\serve.bat` 快速启动。
 
 ## 班级与数据存储
 
-- 首次运行会预置默认班级 **「杭州黑马 AI Python 就业 3期」**，包含示例名单，可直接体验功能。
-- **桌面模式**：所有班级数据写入当前用户目录 `%LOCALAPPDATA%\PickMe\pickme_state.json`。
-- **服务器模式**：默认写入访问者浏览器的 `localStorage`；切换浏览器或设备会得到独立的数据副本。
-- 每个班级拥有独立的学生列表、抽取历史与冷却状态；切换班级时会自动持久化当前班级的数据。
+- 首次运行会预置默认班级 **「杭州黑马 AI Python 就业 3期」**，包含示例名单，便于立即体验功能。
+- **桌面模式**：所有数据写入当前用户目录 `%LOCALAPPDATA%\PickMe\local.pickme.v2.json`，该 JSON 同时包含偏好设置、运行时状态与全部班级信息。
+- **服务器模式**：首次访问自动分配 UUID，并在 `%LOCALAPPDATA%\PickMe\users/{uuid}.pickme.v2.json` 中持久化统一 JSON；浏览器仅保留短期运行时缓存（`pickme::uuid` 与 `pickme::data`）以保持同步。
+- 每个班级的学生名单、抽取历史与冷却状态都收纳在统一文件中，所有操作都会即时写回。
 
 ## 打包单文件 EXE
 
@@ -58,8 +57,7 @@ pyinstaller scripts/desktop.pyw --clean --onefile --noconsole ^
   --name PickMe ^
   --icon icon.ico ^
   --add-data "app/templates;app/templates" ^
-  --add-data "app/static;app/static" ^
-  --add-data "app/data;app/data"
+  --add-data "app/static;app/static"
 ```
 
 生成的可执行文件位于 `dist/PickMe.exe`。GitHub Actions 工作流 `.github/workflows/build-and-release.yml` 已配置 x86 / x64 / ARM64 多架构打包流程。
@@ -70,6 +68,5 @@ pyinstaller scripts/desktop.pyw --clean --onefile --noconsole ^
 scripts/desktop.pyw       # WebView2 封装入口（桌面模式）
 scripts/serve.py          # FastAPI 服务启动脚本
 app/                      # FastAPI 应用、模板与静态资源
-app/paths.py              # 运行时路径与用户数据目录定位
 app/metadata.py           # 应用元数据
 ```

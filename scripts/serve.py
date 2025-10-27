@@ -8,12 +8,13 @@ from pathlib import Path
 
 import uvicorn
 
+APP_RUN_MODE = "server"
+DEFAULT_APP_DATA_DIR = Path.home() / ".pickme" / "users"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from app import create_app  # noqa: E402
-from app.paths import application_paths  # noqa: E402
+from app import create_app
 
 log = logging.getLogger("pickme.server")
 
@@ -31,16 +32,10 @@ def parse_args() -> argparse.Namespace:
         help="Port to bind. Use 0 to select a free port automatically.",
     )
     parser.add_argument(
-        "--user-data-dir",
+        "--app-data-dir",
         type=Path,
         default=None,
-        help="Directory used to store user data when using filesystem storage.",
-    )
-    parser.add_argument(
-        "--default-data-dir",
-        type=Path,
-        default=None,
-        help="Directory containing bundled default data (defaults to packaged assets).",
+        help="Directory used to store application data.",
     )
     parser.add_argument(
         "--reload",
@@ -52,15 +47,6 @@ def parse_args() -> argparse.Namespace:
         default="info",
         help="Logging level passed to uvicorn (e.g. debug, info, warning).",
     )
-    parser.add_argument(
-        "--storage",
-        default="browser",
-        choices=["filesystem", "browser", "auto"],
-        help=(
-            "Persistence mode: filesystem (desktop-style local files), "
-            "browser (per-client localStorage), or auto."
-        ),
-    )
     return parser.parse_args()
 
 
@@ -70,12 +56,6 @@ def find_free_port(host: str) -> int:
         return sock.getsockname()[1]
 
 
-def normalize_storage_mode(value: str) -> str:
-    if value == "auto":
-        return "browser"
-    return value
-
-
 def main() -> None:
     args = parse_args()
 
@@ -83,17 +63,10 @@ def main() -> None:
         level=getattr(logging, str(args.log_level).upper(), logging.INFO)
     )
 
-    _, default_data_dir, user_dir = application_paths()
-    if args.default_data_dir:
-        default_data_dir = args.default_data_dir
-    if args.user_data_dir:
-        user_dir = args.user_data_dir
+    app_data_dir = args.app_data_dir if args.app_data_dir else DEFAULT_APP_DATA_DIR
+    app_data_dir.mkdir(parents=True, exist_ok=True)
 
-    storage_mode = normalize_storage_mode(args.storage)
-    if storage_mode == "filesystem":
-        user_dir.mkdir(parents=True, exist_ok=True)
-
-    app = create_app(user_dir, default_data_dir, storage_mode=storage_mode)
+    app = create_app(app_data_dir, app_run_mode=APP_RUN_MODE)
 
     port = args.port
     if port == 0:
@@ -103,7 +76,7 @@ def main() -> None:
         "Starting PickMe server on http://%s:%s (storage: %s, location: %s)",
         args.host,
         port,
-        app.state.storage.mode,
+        APP_RUN_MODE,
         app.state.storage.location_hint,
     )
 

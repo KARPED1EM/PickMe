@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Iterable
 
 from .students_cms import StudentsCms
 
-CURRENT_VERSION = 1
+CURRENT_VERSION = 2
 DEFAULT_CLASS_NAME = "默认班级"
 
 
@@ -25,6 +25,7 @@ class Classroom:
     updated_at: float
     last_used_at: float
     order_index: int
+    algorithm_data: dict[str, Any] = field(default_factory=dict)
 
     def students_count(self) -> int:
         return len(self.cms.get_students())
@@ -42,14 +43,23 @@ class Classroom:
         }
 
     def to_payload(self) -> dict[str, Any]:
+        algorithm_data = dict(self.algorithm_data)
+        algorithm_data["cooldown_days"] = self.cms.pick_cooldown
+        algorithm_data["history"] = self.cms.export_history()
         return {
             "id": self.class_id,
-            "name": self.name,
-            "created_at": self.created_at,
-            "updated_at": self.updated_at,
-            "last_used_at": self.last_used_at,
-            "order": self.order_index,
-            "data": self.cms.export(),
+            "meta": {
+                "name": self.name,
+                "created_at": self.created_at,
+                "updated_at": self.updated_at,
+                "last_used_at": self.last_used_at,
+                "order": self.order_index,
+            },
+            "algorithm_data": algorithm_data,
+            "students": {
+                str(student.student_id): student.serialize()
+                for student in self.cms.get_students()
+            },
         }
 
 
@@ -144,6 +154,7 @@ class ClassroomsState:
             updated_at=when,
             last_used_at=when,
             order_index=self._next_order_index(),
+            algorithm_data={},
         )
         self._classes[new_id] = classroom
         if set_current:
@@ -201,9 +212,33 @@ class ClassroomsState:
         payload = {
             "version": self._version,
             "current_class_id": self._current_class_id,
-            "classes": [item.to_payload() for item in self.iter_classes()],
+            "classes": self.to_unified_payload(),
         }
         return json.dumps(payload, ensure_ascii=False, indent=2)
+
+    def to_unified_payload(self) -> dict[str, Any]:
+        classes_payload: dict[str, Any] = {}
+        for classroom in self.iter_classes():
+            cms = classroom.cms
+            students_map = {
+                str(student.student_id): student.serialize()
+                for student in cms.get_students()
+            }
+            algorithm_data = dict(classroom.algorithm_data)
+            algorithm_data["cooldown_days"] = cms.pick_cooldown
+            algorithm_data["history"] = cms.export_history()
+            classes_payload[classroom.class_id] = {
+                "meta": {
+                    "name": classroom.name,
+                    "created_at": classroom.created_at,
+                    "updated_at": classroom.updated_at,
+                    "last_used_at": classroom.last_used_at,
+                    "order": classroom.order_index,
+                },
+                "algorithm_data": algorithm_data,
+                "students": students_map,
+            }
+        return classes_payload
 
     def _next_order_index(self) -> int:
         return (
@@ -233,11 +268,15 @@ class ClassroomsState:
         fallback: str | dict[str, Any] | None = None,
     ) -> "ClassroomsState":
         raw = cls._coerce_payload(payload)
+        if cls._is_unified_format(raw):
+            return cls._from_unified_format(raw)
         if cls._is_new_format(raw):
             return cls._from_new_format(raw)
         if cls._is_legacy_format(raw):
             return cls._from_legacy_format(raw)
         fallback_raw = cls._coerce_payload(fallback)
+        if cls._is_unified_format(fallback_raw):
+            return cls._from_unified_format(fallback_raw)
         if cls._is_new_format(fallback_raw):
             return cls._from_new_format(fallback_raw)
         if cls._is_legacy_format(fallback_raw):
@@ -260,6 +299,10 @@ class ClassroomsState:
         if isinstance(payload, (dict, list)):
             return payload
         return None
+
+    @staticmethod
+    def _is_unified_format(raw: dict[str, Any] | list[Any] | None) -> bool:
+        return isinstance(raw, dict) and isinstance(raw.get("classes"), dict)
 
     @staticmethod
     def _is_new_format(raw: dict[str, Any] | list[Any] | None) -> bool:
@@ -303,6 +346,7 @@ class ClassroomsState:
                 updated_at=updated_at,
                 last_used_at=last_used_at,
                 order_index=order_index,
+                algorithm_data={},
             )
         if not classes:
             return cls._default_state()
@@ -312,6 +356,61 @@ class ClassroomsState:
             CURRENT_VERSION,
         )
         return cls(classes, current_class_id, version)
+
+    @classmethod
+    def _from_unified_format(cls, raw: dict[str, Any]) -> "ClassroomsState":
+        classes_payload = raw.get("classes")
+        if not isinstance(classes_payload, dict):
+            return cls._default_state()
+        active_class_id = str(raw.get("current_class_id") or "")
+        classes: dict[str, Classroom] = {}
+        now = time.time()
+        for fallback_index, (class_id, class_payload) in enumerate(
+            classes_payload.items()
+        ):
+            if not isinstance(class_payload, dict):
+                continue
+            meta = class_payload.get("meta")
+            if not isinstance(meta, dict):
+                meta = {}
+            algorithm = class_payload.get("algorithm_data")
+            if not isinstance(algorithm, dict):
+                algorithm = {}
+            students_blob = class_payload.get("students")
+            if isinstance(students_blob, dict):
+                students_payload = list(students_blob.values())
+            elif isinstance(students_blob, list):
+                students_payload = students_blob
+            else:
+                students_payload = []
+            cms_payload = {
+                "cooldown_days": algorithm.get(
+                    "cooldown_days", meta.get("cooldown_days", 3)
+                ),
+                "students": students_payload,
+                "history": algorithm.get("history"),
+            }
+            cms = StudentsCms.deserialize(cms_payload)
+            algorithm_data = dict(algorithm)
+            classroom = Classroom(
+                class_id=str(class_id),
+                name=str(meta.get("name") or DEFAULT_CLASS_NAME),
+                cms=cms,
+                created_at=cls._coerce_float(meta.get("created_at"), default=now),
+                updated_at=cls._coerce_float(meta.get("updated_at"), default=now),
+                last_used_at=cls._coerce_float(meta.get("last_used_at"), default=0.0),
+                order_index=cls._coerce_int(meta.get("order"), default=fallback_index),
+                algorithm_data=algorithm_data,
+            )
+            classes[classroom.class_id] = classroom
+        if not classes:
+            return cls._default_state()
+        version = max(
+            cls._coerce_int(raw.get("version"), default=CURRENT_VERSION),
+            CURRENT_VERSION,
+        )
+        state = cls(classes, active_class_id, version)
+        return state
 
     @classmethod
     def _from_legacy_format(cls, raw: dict[str, Any] | list[Any]) -> "ClassroomsState":
@@ -326,6 +425,7 @@ class ClassroomsState:
             updated_at=now,
             last_used_at=now,
             order_index=0,
+            algorithm_data={},
         )
         return cls({class_id: classroom}, class_id)
 
@@ -341,6 +441,7 @@ class ClassroomsState:
             updated_at=now,
             last_used_at=now,
             order_index=0,
+            algorithm_data={},
         )
         return cls({class_id: classroom}, class_id)
 

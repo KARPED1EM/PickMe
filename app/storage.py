@@ -1,96 +1,97 @@
 from __future__ import annotations
 
-import threading
+import json
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Callable
 
-from .classrooms import ClassroomsState
-from .state_manager import StateManager
-
-# Backward compatibility
-DataManager = StateManager
+from .user_data import DEFAULT_UUID, UserData, UserDataStore
 
 
-class StorageBackend(Protocol):
-    """Abstract persistence strategy used by the application."""
+class UnifiedStorage:
+    """Unified persistence interface for per-user JSON payloads."""
 
-    mode: str
-    location_hint: str
+    def __init__(
+        self,
+        app_run_mode: str,
+        app_data_dir: Path,
+    ) -> None:
+        self.mode = "desktop" if app_run_mode == "desktop" else "server"
+        self._store = UserDataStore(app_data_dir)
 
-    def load(self, request_data: dict[str, Any] | None = None) -> ClassroomsState:
-        """Return a ClassroomsState representing the current data state."""
+    @property
+    def location_hint(self) -> str:
+        return self._store.location_hint
 
-    def save(self, state: ClassroomsState) -> None:
-        """Persist the provided state (no-op for some backends)."""
+    def ensure_user(
+        self,
+        user_id: str | None = None,
+    ) -> tuple[UserData, str, bool]:
+        """Load existing data or create a new payload for the given user."""
+        candidate = self._candidate_user_id(user_id)
+        data, normalized, created = self._store.ensure(candidate)
+        data.ensure_defaults()
+        if self.mode == "desktop":
+            normalized = DEFAULT_UUID
+            data.user_id = DEFAULT_UUID
+        return data, normalized, created
 
+    def load_user(self, user_id: str) -> UserData:
+        normalized = self.normalize_user_id(user_id)
+        data = self._store.load(normalized)
+        data.user_id = normalized
+        data.ensure_defaults()
+        return data
 
-class FileStorageBackend:
-    """Persist data on the local filesystem (single-user desktop mode)."""
+    def save_user(self, data: UserData) -> None:
+        normalized = self.normalize_user_id(data.user_id)
+        data.user_id = normalized
+        data.ensure_defaults()
+        self._store.save(data)
 
-    mode = "filesystem"
+    def export_user(self, data: UserData) -> str:
+        return json.dumps(data.to_dict(), ensure_ascii=False, indent=2)
 
-    def __init__(self, user_dir: Path, default_data_dir: Path | None = None) -> None:
-        StateManager.configure(user_dir, default_data_dir)
-        self._lock = threading.RLock()
-        self.location_hint = str(StateManager.user_data_dir())
-        self._default_payload = _load_default_payload(default_data_dir)
+    def with_user(
+        self,
+        user_id: str,
+        handler: Callable[[UserData], Any],
+    ) -> tuple[UserData, Any]:
+        normalized = self.normalize_user_id(user_id)
+        data = self._store.load(normalized)
+        data.user_id = normalized
+        data.ensure_defaults()
+        result = handler(data)
+        self.save_user(data)
+        return data, result
 
-    def load(self, request_data: dict[str, Any] | None = None) -> ClassroomsState:
-        with self._lock:
-            data = StateManager.load_state()
-        return ClassroomsState.from_payload(data, fallback=self._default_payload)
+    def _candidate_user_id(self, user_id: str | None) -> str | None:
+        if self.mode == "desktop":
+            return DEFAULT_UUID
+        normalized = self._normalize_uuid(user_id)
+        if normalized and self._is_valid_server_uuid(normalized):
+            return normalized
+        return None
 
-    def save(self, state: ClassroomsState) -> None:
-        payload = state.serialize()
-        with self._lock:
-            StateManager.save_state(payload)
+    def normalize_user_id(self, user_id: str | None) -> str:
+        if self.mode == "desktop":
+            return DEFAULT_UUID
+        normalized = self._normalize_uuid(user_id)
+        if normalized and self._is_valid_server_uuid(normalized):
+            return normalized
+        raise ValueError("Invalid user_id")
 
+    @staticmethod
+    def _normalize_uuid(value: str | None) -> str | None:
+        if not value:
+            return None
+        cleaned = str(value).strip().lower()
+        return cleaned or None
 
-class BrowserStorageBackend:
-    """Persist data inside the user's browser (multi-user server mode)."""
-
-    mode = "browser"
-    location_hint = "浏览器存储 (localStorage)"
-
-    def __init__(self, default_data_dir: Path | None = None) -> None:
-        self._default_payload = _load_default_payload(default_data_dir)
-
-    def load(self, request_data: dict[str, Any] | None = None) -> ClassroomsState:
-        if request_data:
-            payload = request_data.get("payload")
-            if isinstance(payload, (str, dict)):
-                return ClassroomsState.from_payload(
-                    payload, fallback=self._default_payload
-                )
-        return ClassroomsState.from_payload(None, fallback=self._default_payload)
-
-    def save(self, state: ClassroomsState) -> None:
-        # Persistence happens client side; nothing to do on the server.
-        return
-
-
-def create_storage_backend(
-    mode: str | None,
-    user_dir: Path,
-    default_data_dir: Path | None,
-) -> StorageBackend:
-    normalized = (mode or "filesystem").strip().lower()
-    if normalized in {"filesystem", "file", "local"}:
-        return FileStorageBackend(user_dir, default_data_dir)
-    if normalized in {"browser", "client", "localstorage", "client-storage"}:
-        return BrowserStorageBackend(default_data_dir)
-    if normalized == "auto":
-        return FileStorageBackend(user_dir, default_data_dir)
-    raise ValueError(f"Unsupported storage mode: {mode!r}")
-
-
-def _load_default_payload(default_data_dir: Path | None) -> str:
-    payload = StateManager.DEFAULT_PAYLOAD
-    if default_data_dir:
-        candidate = default_data_dir / StateManager.DEFAULT_FILE
-        if candidate.exists():
-            try:
-                return candidate.read_text(encoding="utf-8")
-            except UnicodeDecodeError:
-                return candidate.read_text(encoding="utf-8", errors="ignore")
-    return payload
+    @staticmethod
+    def _is_valid_server_uuid(value: str) -> bool:
+        if len(value) != 32:
+            return False
+        for char in value:
+            if char not in "0123456789abcdef":
+                return False
+        return True
