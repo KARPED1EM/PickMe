@@ -266,22 +266,35 @@ class ClassroomsState:
         payload: str | dict[str, Any] | None,
         *,
         fallback: str | dict[str, Any] | None = None,
+        allow_default: bool = True,
     ) -> "ClassroomsState":
+        state = cls._build_from_payload(payload, allow_default=allow_default)
+        if state is not None:
+            return state
+        fallback_state = cls._build_from_payload(fallback, allow_default=allow_default)
+        if fallback_state is not None:
+            return fallback_state
+        if allow_default:
+            return cls._default_state()
+        raise ValueError("invalid_classrooms_payload")
+
+    @classmethod
+    def _build_from_payload(
+        cls,
+        payload: str | dict[str, Any] | list[Any] | None,
+        *,
+        allow_default: bool,
+    ) -> "ClassroomsState" | None:
         raw = cls._coerce_payload(payload)
+        if raw is None:
+            return None
         if cls._is_unified_format(raw):
-            return cls._from_unified_format(raw)
+            return cls._from_unified_format(raw, allow_default=allow_default)
         if cls._is_new_format(raw):
-            return cls._from_new_format(raw)
+            return cls._from_new_format(raw, allow_default=allow_default)
         if cls._is_legacy_format(raw):
-            return cls._from_legacy_format(raw)
-        fallback_raw = cls._coerce_payload(fallback)
-        if cls._is_unified_format(fallback_raw):
-            return cls._from_unified_format(fallback_raw)
-        if cls._is_new_format(fallback_raw):
-            return cls._from_new_format(fallback_raw)
-        if cls._is_legacy_format(fallback_raw):
-            return cls._from_legacy_format(fallback_raw)
-        return cls._default_state()
+            return cls._from_legacy_format(raw, allow_default=allow_default)
+        return None
 
     @staticmethod
     def _coerce_payload(
@@ -315,7 +328,9 @@ class ClassroomsState:
         return isinstance(raw, list)
 
     @classmethod
-    def _from_new_format(cls, raw: dict[str, Any]) -> "ClassroomsState":
+    def _from_new_format(
+        cls, raw: dict[str, Any], *, allow_default: bool = True
+    ) -> "ClassroomsState | None":
         classes: dict[str, Classroom] = {}
         raw_classes_data = raw.get("classes_data")
         if not isinstance(raw_classes_data, dict):
@@ -349,7 +364,7 @@ class ClassroomsState:
                 algorithm_data={},
             )
         if not classes:
-            return cls._default_state()
+            return cls._default_state() if allow_default else None
         current_class_id = str(raw.get("current_class_id") or "")
         version = max(
             cls._coerce_int(raw.get("version"), default=CURRENT_VERSION),
@@ -358,10 +373,12 @@ class ClassroomsState:
         return cls(classes, current_class_id, version)
 
     @classmethod
-    def _from_unified_format(cls, raw: dict[str, Any]) -> "ClassroomsState":
+    def _from_unified_format(
+        cls, raw: dict[str, Any], *, allow_default: bool = True
+    ) -> "ClassroomsState | None":
         classes_payload = raw.get("classes")
-        if not isinstance(classes_payload, dict):
-            return cls._default_state()
+        if not isinstance(classes_payload, dict) or not classes_payload:
+            return cls._default_state() if allow_default else None
         active_class_id = str(raw.get("current_class_id") or "")
         classes: dict[str, Classroom] = {}
         now = time.time()
@@ -421,7 +438,7 @@ class ClassroomsState:
             )
             classes[classroom.class_id] = classroom
         if not classes:
-            return cls._default_state()
+            return cls._default_state() if allow_default else None
         version = max(
             cls._coerce_int(raw.get("version"), default=CURRENT_VERSION),
             CURRENT_VERSION,
@@ -430,7 +447,9 @@ class ClassroomsState:
         return state
 
     @classmethod
-    def _from_legacy_format(cls, raw: dict[str, Any] | list[Any]) -> "ClassroomsState":
+    def _from_legacy_format(
+        cls, raw: dict[str, Any] | list[Any], *, allow_default: bool = True
+    ) -> "ClassroomsState | None":
         cms = StudentsCms.deserialize(raw)
         now = time.time()
         class_id = _generate_id()

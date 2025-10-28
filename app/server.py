@@ -537,9 +537,14 @@ def create_app(
         if isinstance(parsed_payload, dict) and isinstance(
             parsed_payload.get("classes"), dict
         ):
-            imported = UserData.from_dict(
-                parsed_payload, default_user_id=normalized_uuid
-            )
+            try:
+                imported = UserData.from_dict(
+                    parsed_payload,
+                    default_user_id=normalized_uuid,
+                    strict=True,
+                )
+            except ValueError:
+                return error_response("导入文件格式不正确", status=400)
             imported.user_id = normalized_uuid
             imported.touch_modified()
             storage.save_user(imported)
@@ -552,8 +557,8 @@ def create_app(
                 }
             )
         try:
-            state = ClassroomsState.from_payload(parsed_payload)
-        except Exception:
+            state = ClassroomsState.from_payload(parsed_payload, allow_default=False)
+        except ValueError:
             return error_response("导入文件格式不正确", status=400)
         user_data.classrooms = state
         user_data.touch_modified()

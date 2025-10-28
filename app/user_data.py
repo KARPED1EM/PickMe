@@ -351,8 +351,11 @@ class UserData:
         payload: dict[str, Any] | None,
         *,
         default_user_id: str = DEFAULT_UUID,
+        strict: bool = False,
     ) -> "UserData":
         if not isinstance(payload, dict):
+            if strict:
+                raise ValueError("invalid_user_data_payload")
             payload = {}
         version = payload.get("version")
         try:
@@ -368,7 +371,14 @@ class UserData:
         runtime = payload.get("runtime")
         metadata = payload.get("meta") or payload.get("metadata")
         legacy_payload = _unified_to_legacy(payload)
-        state = ClassroomsState.from_payload(payload, fallback=legacy_payload)
+        try:
+            state = ClassroomsState.from_payload(
+                payload,
+                fallback=legacy_payload,
+                allow_default=not strict,
+            )
+        except ValueError as error:
+            raise ValueError("invalid_user_data_payload") from error
         data = cls(
             user_id=user_id,
             classrooms=state,
