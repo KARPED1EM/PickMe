@@ -309,11 +309,11 @@ function computeYearRangeLabel(startYear) {
 
 function formatUidForWatermark(rawUid) {
     if (!rawUid) {
-        return "UID ----";
+        return "Invalid UID";
     }
     const trimmed = String(rawUid).trim();
-    if (!trimmed) {
-        return "UID ----";
+    if (!trimmed || trimmed.toLowerCase() === "local") {
+        return "Offline Mode";
     }
     const normalized =
         trimmed.replace(/[^0-9a-z]/gi, "").toUpperCase() || trimmed.toUpperCase();
