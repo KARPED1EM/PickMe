@@ -25,7 +25,7 @@ PickMe 是一款基于 FastAPI 与现代 Web 前端的随机点名工具，可�
 python scripts/desktop.pyw
 ```
 
-首次启动会在本机 `%LOCALAPPDATA%\PickMe` 目录下生成数据文件，并自动打开 WebView2 界面。若系统未安装 WebView2 运行时，应用会提示您访问微软官方网站下载。
+首次启动会在 `~/.pickme`（Windows 上为 `%USERPROFILE%\.pickme`）目录下生成数据文件，并自动打开 WebView2 界面。若系统未安装 WebView2 运行时，应用会提示您访问微软官方网站下载。
 
 ### 2. 服务器 / 开发模式
 
@@ -33,7 +33,7 @@ python scripts/desktop.pyw
 python -m scripts.serve --host 0.0.0.0 --port 8000
 ```
 
-默认使用 `browser` 存储模式，为每位访客分配 UUID 并在服务器的用户数据目录（如 `<app-data-dir>/users/{uuid}.pickme.v2.json`）中持久化 JSON 文件。浏览器仅保留短期运行时缓存，以确保每次进入页面时都能刷新数据。也可指定参数：
+默认使用服务器存储模式，为每位访客分配 UUID 并在服务器的用户数据目录（如 `<app-data-dir>/users/{uuid}.pickme.v2.json`）中持久化 JSON 文件。浏览器仅保留短期运行时缓存，以确保每次进入页面时都能刷新数据。也可指定参数：
 
 | 参数 | 说明 |
 | ---- | ---- |
@@ -45,8 +45,8 @@ Windows 用户亦可执行 `scripts\serve.bat` 快速启动。
 ## 班级与数据存储
 
 - 首次运行会预置默认班级 **「杭州黑马 AI Python 就业 3期」**，包含示例名单，便于立即体验功能。
-- **桌面模式**：所有数据写入当前用户目录 `%LOCALAPPDATA%\PickMe\local.pickme.v2.json`，该 JSON 同时包含偏好设置、运行时状态与全部班级信息。
-- **服务器模式**：首次访问自动分配 UUID，并在 `%LOCALAPPDATA%\PickMe\users/{uuid}.pickme.v2.json` 中持久化统一 JSON；浏览器仅保留短期运行时缓存（`pickme::uuid` 与 `pickme::data`）以保持同步。
+- **桌面模式**：所有数据写入 `~/.pickme/local.pickme.v2.json`（Windows 上为 `%USERPROFILE%\.pickme\local.pickme.v2.json`），该 JSON 同时包含偏好设置、运行时状态与全部班级信息。
+- **服务器模式**：首次访问自动分配 UUID，并在 `~/.pickme/users/{uuid}.pickme.v2.json`（Windows 上为 `%USERPROFILE%\.pickme\users\{uuid}.pickme.v2.json`）中持久化统一 JSON；浏览器仅保留短期运行时缓存（`pickme::uuid` 与 `pickme::data`）以保持同步。
 - 每个班级的学生名单、抽取历史与冷却状态都收纳在统一文件中，所有操作都会即时写回。
 
 ## 打包单文件 EXE

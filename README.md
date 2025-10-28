@@ -25,7 +25,7 @@ PickMe is a random name picker tool built with FastAPI and modern web frontend. 
 python scripts/desktop.pyw
 ```
 
-On first launch, data files will be created in `%LOCALAPPDATA%\PickMe` and the WebView2 interface will open automatically. If WebView2 Runtime is not installed, the application will prompt you to download it from the Microsoft official website.
+On first launch, data files will be created in `~/.pickme` (on Windows: `%USERPROFILE%\.pickme`) and the WebView2 interface will open automatically. If WebView2 Runtime is not installed, the application will prompt you to download it from the Microsoft official website.
 
 ### 2. Server / Development Mode
 
@@ -33,7 +33,7 @@ On first launch, data files will be created in `%LOCALAPPDATA%\PickMe` and the W
 python -m scripts.serve --host 0.0.0.0 --port 8000
 ```
 
-By default, uses `browser` storage mode where each visitor receives a UUID backed by a JSON file on the server (e.g. `<app-data-dir>/users/{uuid}.pickme.v2.json`). The browser keeps a short-lived cached payload locally for faster startup. Available parameters:
+By default, uses server storage mode where each visitor receives a UUID backed by a JSON file on the server (e.g. `<app-data-dir>/users/{uuid}.pickme.v2.json`). The browser keeps a short-lived cached payload locally for faster startup. Available parameters:
 
 | Parameter | Description |
 | ---- | ---- |
@@ -45,8 +45,8 @@ Windows users can also run `scripts\serve.bat` for quick startup.
 ## Classrooms & Data Storage
 
 - First run includes a default classroom **"杭州黑马 AI Python 就业 3期"** with sample student list for immediate testing.
-- **Desktop Mode**: All data is stored in `%LOCALAPPDATA%\PickMe\local.pickme.v2.json`, a single unified JSON file that contains preferences, runtime state, classes, and students.
-- **Server Mode**: Each visitor receives a UUID on first load; the backend stores the unified JSON at `%LOCALAPPDATA%\PickMe\users/{uuid}.pickme.v2.json`. The browser keeps only a refreshed runtime cache (`pickme::uuid` and `pickme::data`) to stay in sync.
+- **Desktop Mode**: All data is stored in `~/.pickme/local.pickme.v2.json` (on Windows: `%USERPROFILE%\.pickme\local.pickme.v2.json`), a single unified JSON file that contains preferences, runtime state, classes, and students.
+- **Server Mode**: Each visitor receives a UUID on first load; the backend stores the unified JSON at `~/.pickme/users/{uuid}.pickme.v2.json` (on Windows: `%USERPROFILE%\.pickme\users\{uuid}.pickme.v2.json`). The browser keeps only a refreshed runtime cache (`pickme::uuid` and `pickme::data`) to stay in sync.
 - Each classroom keeps its student list, pick history, and cooldown state inside that unified file; updates persist automatically after every action.
 
 ## Building Single-File EXE
