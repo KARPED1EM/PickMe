@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Iterable
 
-from .user_data import UserData
 from .classrooms import ClassroomsState
 from .random_provider import get_today_random
 from .student import Student
