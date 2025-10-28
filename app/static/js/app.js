@@ -292,7 +292,61 @@ function toFiniteNumber(value) {
 const APP_STORAGE_MODE = window.__APP_STORAGE_MODE__ || "desktop";
 const APP_RUNNING_ON_DESKTOP = window.__APP_STORAGE_MODE__ === "desktop";
 const STORAGE_LOCATION = window.__APP_STORAGE_LOCATION__ || "";
-const APP_META = window.__APP_META__ && typeof window.__APP_META__ === "object" ? window.__APP_META__ : {};
+const APP_META =
+    window.__APP_META__ && typeof window.__APP_META__ === "object"
+        ? window.__APP_META__
+        : {};
+const APP_COPYRIGHT_START_YEAR = 2025;
+const WATERMARK_ELEMENT_ID = "app-watermark";
+
+function computeYearRangeLabel(startYear) {
+    const currentYear = new Date().getFullYear();
+    if (!Number.isFinite(currentYear) || currentYear <= startYear) {
+        return String(startYear);
+    }
+    return `${startYear}-${currentYear}`;
+}
+
+function formatUidForWatermark(rawUid) {
+    if (!rawUid) {
+        return "UID ----";
+    }
+    const trimmed = String(rawUid).trim();
+    if (!trimmed) {
+        return "UID ----";
+    }
+    const normalized =
+        trimmed.replace(/[^0-9a-z]/gi, "").toUpperCase() || trimmed.toUpperCase();
+    const head = normalized.slice(0, 6).padEnd(6, "-");
+    const tail = normalized.slice(-6).padStart(6, "-");
+    return `UID ${head}-${tail}`;
+}
+
+function resolveWatermarkOwner() {
+    if (APP_META && typeof APP_META === "object") {
+        if (APP_META.developer) {
+            return APP_META.developer;
+        }
+        if (APP_META.name) {
+            return APP_META.name;
+        }
+    }
+    return "Pick Me";
+}
+
+function updateAppWatermark(rawUid) {
+    const element = document.getElementById(WATERMARK_ELEMENT_ID);
+    if (!element) {
+        return;
+    }
+    const yearLabel = computeYearRangeLabel(APP_COPYRIGHT_START_YEAR);
+    const owner = resolveWatermarkOwner();
+    const uidLabel = formatUidForWatermark(rawUid);
+    element.textContent = `${yearLabel} © ${owner} | ${uidLabel}`;
+}
+
+updateAppWatermark(window.__APP_INITIAL_UUID__);
+
 const RUNTIME_LABELS = {
     server: "网页版",
     desktop: "客户端",
@@ -325,6 +379,7 @@ const sessionStore = (() => {
             try {
                 const response = await this.requestSession(cachedUuid);
                 this.uuid = response.uuid || cachedUuid || null;
+                updateAppWatermark(this.uuid);
                 this.data =
                     response.data && typeof response.data === "object"
                         ? response.data
@@ -333,6 +388,7 @@ const sessionStore = (() => {
             } catch (error) {
                 if (cachedPayload) {
                     this.uuid = cachedUuid || null;
+                    updateAppWatermark(this.uuid);
                     this.data = cachedPayload;
                     console.warn(
                         "Session initialization failed, using cached data",
@@ -437,6 +493,7 @@ const sessionStore = (() => {
                 this.data = payload.data;
             }
             this.persist();
+            updateAppWatermark(this.uuid);
         },
     };
 })();
@@ -1231,6 +1288,17 @@ function buildClassAddModal() {
 </div>`;
 }
 
+function maskIdentifier(value) {
+    if (typeof value !== "string") {
+        return "";
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return "";
+    }
+    return trimmed.replace(/[A-Za-z0-9]/g, "*");
+}
+
 function buildSettingsModal() {
     const meta = APP_META && typeof APP_META === "object" ? APP_META : {};
     const appName = escapeHtml(String(meta.name || "Pick Me"));
@@ -1242,9 +1310,18 @@ function buildSettingsModal() {
         ? `<a class="settings-chip-link" href="${escapeHtml(repositoryValue)}" target="_blank" rel="noopener noreferrer">访问仓库</a>`
         : '<span class="settings-chip is-muted">暂无</span>';
     const runtimeLabel = escapeHtml(RUNTIME_LABELS[APP_STORAGE_MODE] || "客户端");
-    const locationHint = STORAGE_LOCATION || (APP_RUNNING_ON_DESKTOP ? "未提供" : "浏览器 localStorage");
-    const locationValue = escapeHtml(locationHint);
+    const locationDesc = APP_RUNNING_ON_DESKTOP ? "您的数据保存在" : "您的数据由服务器保管，不要泄漏下方的UUID，以免他人窃取您的数据";
+    const sessionUuidRaw = typeof sessionStore?.uuid === "string" ? sessionStore.uuid.trim() : "";
+    const locationHint = APP_RUNNING_ON_DESKTOP ? (STORAGE_LOCATION || "未提供") : sessionUuidRaw || "未登录";
     const locationTitle = escapeHtml(locationHint);
+    const shouldMaskLocation = !APP_RUNNING_ON_DESKTOP && sessionUuidRaw.length > 0;
+    const maskedLocation = shouldMaskLocation ? maskIdentifier(sessionUuidRaw) : "";
+    const locationValueHtml = shouldMaskLocation
+        ? `<div class="settings-location-secret" data-secret-container>
+            <span class="settings-location-value settings-location-value-masked" data-secret-value data-secret-raw="${escapeHtml(sessionUuidRaw)}" data-secret-mask="${escapeHtml(maskedLocation)}">${escapeHtml(maskedLocation)}</span>
+          </div>`
+        : `<span class="settings-location-value">${escapeHtml(locationHint)}</span>`;
+    const locationTitleAttr = shouldMaskLocation ? "" : ` title="${locationTitle}"`;
     return `
 <div class="modal-backdrop settings-modal-backdrop">
   <div class="modal-panel glass settings-modal">
@@ -1286,9 +1363,9 @@ function buildSettingsModal() {
         <section class="settings-card settings-runtime-card">
           <h3 class="settings-card-title">用户数据</h3>
           <p class="settings-description">导入 / 导出会覆盖全部班级、学生与历史记录，适用于跨设备迁移或备份。</p>
-          <div class="settings-location-card" title="${locationTitle}">
-            <span class="settings-location-label">当前数据路径</span>
-            <span class="settings-location-value">${locationValue}</span>
+          <div class="settings-location-card"${locationTitleAttr}>
+            <span class="settings-location-label">${locationDesc}</span>
+            ${locationValueHtml}
           </div>
           <div class="settings-actions-row">
             <button id="settings-export" type="button" class="btn btn-outline-light settings-action">导出数据</button>
@@ -1327,6 +1404,80 @@ function openSettingsModal() {
         });
         importInput.addEventListener("change", handleSettingsImportSelect);
     }
+    const secretContainers = dom.modalRoot.querySelectorAll("[data-secret-container]");
+    secretContainers.forEach(container => {
+        const valueEl = container.querySelector("[data-secret-value]");
+        if (!valueEl) {
+            return;
+        }
+        const rawValue = valueEl.getAttribute("data-secret-raw") || "";
+        const maskValue = valueEl.getAttribute("data-secret-mask") || "";
+        const toggle = container.querySelector("[data-secret-toggle]");
+        let pinned = false;
+        const applyMask = () => {
+            if (!maskValue) {
+                return;
+            }
+            valueEl.textContent = maskValue;
+            valueEl.classList.remove("is-revealed");
+        };
+        const applyRaw = () => {
+            if (!rawValue) {
+                return;
+            }
+            valueEl.textContent = rawValue;
+            valueEl.classList.add("is-revealed");
+        };
+        if (maskValue) {
+            applyMask();
+        }
+        container.addEventListener("mouseenter", () => {
+            if (!rawValue || pinned) {
+                return;
+            }
+            applyRaw();
+        });
+        container.addEventListener("mouseleave", () => {
+            if (!rawValue || pinned) {
+                return;
+            }
+            applyMask();
+        });
+        container.addEventListener("focusin", () => {
+            if (!rawValue || pinned) {
+                return;
+            }
+            applyRaw();
+        });
+        container.addEventListener("focusout", () => {
+            if (!rawValue || pinned) {
+                return;
+            }
+            applyMask();
+        });
+        if (toggle) {
+            const showLabel = toggle.getAttribute("data-label-show") || "显示";
+            const hideLabel = toggle.getAttribute("data-label-hide") || "隐藏";
+            const updateToggleLabel = visible => {
+                toggle.textContent = visible ? hideLabel : showLabel;
+            };
+            updateToggleLabel(false);
+            toggle.addEventListener("click", () => {
+                if (!rawValue) {
+                    return;
+                }
+                pinned = !pinned;
+                toggle.setAttribute("aria-pressed", String(pinned));
+                toggle.classList.toggle("is-active", pinned);
+                updateToggleLabel(pinned);
+                if (pinned) {
+                    applyRaw();
+                } else {
+                    applyMask();
+                }
+            });
+        }
+    });
 }
 
 function openClassAddModal() {

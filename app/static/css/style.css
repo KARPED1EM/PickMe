@@ -61,6 +61,20 @@
     pointer-events: none;
 }
 
+.app-watermark {
+    position: fixed;
+    top: 2px;
+    right: 8px;
+    z-index: 40;
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    font-weight: 500;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+}
+
 .glass {
     background: rgba(24, 28, 46, 0.78);
     backdrop-filter: blur(20px);
