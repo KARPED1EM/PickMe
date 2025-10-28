@@ -10,6 +10,10 @@ def get_today_random(
         available = [x for x in available if x != last_picked]
     if available:
         return secrets.choice(available)
-    if last_picked is not None and last_picked not in disabled:
+    if (
+        last_picked is not None
+        and last_picked not in disabled
+        and last_picked not in items
+    ):
         return last_picked
     return None
