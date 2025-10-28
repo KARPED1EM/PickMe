@@ -4418,7 +4418,7 @@ function initFirstVisitPopup() {
         if (isClientApp) {
             title = "您正在使用客户端";
             content = `
-                <p>您也可以试试 <a href="https://pickme.leever.cn" class="first-visit-recommend" target="_blank" rel="noopener noreferrer">网页版</a> 👈</p>
+                <p>您也可以试试 <a href="https://ithm.leever.cn" class="first-visit-recommend" target="_blank" rel="noopener noreferrer">网页版</a> 👈</p>
                 <p>性能开销更低，无需额外依赖~</p>
             `;
         } else {
