@@ -5,8 +5,8 @@ from dataclasses import dataclass, asdict
 
 try:
     from importlib import metadata as importlib_metadata
-except ImportError:  # pragma: no cover
-    import importlib_metadata  # type: ignore
+except ImportError:
+    import importlib_metadata
 
 __all__ = ["AppMetadata", "load_app_metadata"]
 
@@ -30,7 +30,7 @@ def _resolve_version() -> str:
             return value
     try:
         return importlib_metadata.version("pickme")
-    except importlib_metadata.PackageNotFoundError:  # type: ignore[attr-defined]
+    except importlib_metadata.PackageNotFoundError:
         return AppMetadata.version
 
 
