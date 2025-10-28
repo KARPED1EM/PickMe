@@ -309,6 +309,7 @@ class UserData:
             "runtime": runtime,
             "classes": self.classrooms.to_unified_payload(),
         }
+        payload["current_class_id"] = self.classrooms.current_class_id
         if self.metadata:
             payload["meta"] = self.metadata
         return payload
