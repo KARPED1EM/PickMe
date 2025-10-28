@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Iterable
 
+from .user_data import UserData
 from .classrooms import ClassroomsState
 from .random_provider import get_today_random
 from .student import Student
@@ -118,6 +119,7 @@ class DrawResult:
 class DrawService:
     def execute(
         self,
+        user_id: str,
         state: ClassroomsState,
         request: DrawRequest,
         *,
@@ -126,13 +128,14 @@ class DrawService:
         cms = state.current_cms
         moment = time.time() if timestamp is None else float(timestamp)
         if request.mode is DrawMode.GROUP:
-            return self._draw_group(state, cms, request, moment)
+            return self._draw_group(user_id, state, cms, request, moment)
         if request.mode is DrawMode.BATCH:
-            return self._draw_batch(state, cms, request, moment)
-        return self._draw_single(state, cms, request, moment)
+            return self._draw_batch(user_id, state, cms, request, moment)
+        return self._draw_single(user_id, state, cms, request, moment)
 
     def _draw_single(
         self,
+        user_id: str,
         state: ClassroomsState,
         cms: StudentsCms,
         request: DrawRequest,
@@ -143,6 +146,7 @@ class DrawService:
             raise DrawError("no_students_available")
         classroom = state.current_class
         chosen = self._pick_student(
+            user_id,
             classroom,
             cms,
             moment,
@@ -171,6 +175,7 @@ class DrawService:
 
     def _draw_batch(
         self,
+        user_id: str,
         state: ClassroomsState,
         cms: StudentsCms,
         request: DrawRequest,
@@ -188,6 +193,7 @@ class DrawService:
         selected_ids: set[int] = set()
         for _ in range(count):
             student = self._pick_student(
+                user_id,
                 classroom,
                 cms,
                 moment,
@@ -218,6 +224,7 @@ class DrawService:
 
     def _draw_group(
         self,
+        user_id: str,
         state: ClassroomsState,
         cms: StudentsCms,
         request: DrawRequest,
@@ -228,7 +235,7 @@ class DrawService:
             raise DrawError("no_groups_available")
         candidates = [int(value) for value in groups]
         placeholder = secrets.choice(candidates)
-        group_value = get_today_random(candidates, [], placeholder)
+        group_value = get_today_random(candidates, [], placeholder, user_id)
         if group_value is None:
             raise DrawError("no_groups_available")
         members = self._group_members(
@@ -322,6 +329,7 @@ class DrawService:
 
     def _pick_student(
         self,
+        user_id: str,
         classroom,
         cms: StudentsCms,
         moment: float,
@@ -342,7 +350,7 @@ class DrawService:
         last_picked = self._resolve_last_pick(classroom, moment)
         if last_picked is not None and last_picked not in lookup:
             last_picked = None
-        chosen_id = get_today_random(items, disabled, last_picked)
+        chosen_id = get_today_random(items, disabled, last_picked, user_id)
         if chosen_id is None:
             raise DrawError("no_students_available")
         student = lookup.get(chosen_id)

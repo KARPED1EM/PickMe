@@ -3,7 +3,7 @@ from typing import List, Optional
 
 
 def get_today_random(
-    items: List[int], disabled: List[int], last_picked: Optional[int]
+    items: List[int], disabled: List[int], last_picked: Optional[int], user_id: str
 ) -> Optional[int]:
     available = [x for x in items if x not in disabled]
     if last_picked is not None:
