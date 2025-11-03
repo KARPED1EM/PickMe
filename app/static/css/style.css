@@ -1380,3 +1380,116 @@ body.modal-open { overflow: hidden; }
         font-size: 0.9rem;
     }
 }
+
+/* Draw Mode Tooltip */
+.draw-mode-tooltip {
+    position: fixed;
+    z-index: 9500;
+    background: rgba(28, 32, 52, 0.96);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+    box-shadow:
+        0 12px 32px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+    padding: 1rem 1.25rem;
+    max-width: 260px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+    transform: translateY(8px);
+}
+
+.draw-mode-tooltip:not([hidden]) {
+    pointer-events: auto;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.draw-mode-tooltip-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: rgba(221, 230, 255, 0.6);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    z-index: 1;
+}
+
+.draw-mode-tooltip-close:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(221, 230, 255, 0.9);
+}
+
+.draw-mode-tooltip-close:active {
+    transform: scale(0.95);
+}
+
+.draw-mode-tooltip-close svg {
+    width: 14px;
+    height: 14px;
+}
+
+.draw-mode-tooltip-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.draw-mode-tooltip-icon {
+    flex-shrink: 0;
+    font-size: 22px;
+    line-height: 1;
+}
+
+.draw-mode-tooltip-text {
+    flex: 1;
+    margin: 0;
+    color: rgba(221, 230, 255, 0.9);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    padding-right: 1rem;
+}
+
+.draw-mode-tooltip-arrow {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: rgba(28, 32, 52, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-left: none;
+    border-bottom: none;
+    transform: rotate(45deg);
+    box-shadow: 2px -2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Arrow pointing left (default) */
+.draw-mode-tooltip-arrow {
+    right: -6px;
+    top: 50%;
+    margin-top: -6px;
+}
+
+@media (max-width: 768px) {
+    .draw-mode-tooltip {
+        max-width: 220px;
+        padding: 0.875rem 1rem;
+    }
+
+    .draw-mode-tooltip-icon {
+        font-size: 20px;
+    }
+
+    .draw-mode-tooltip-text {
+        font-size: 0.85rem;
+    }
+}

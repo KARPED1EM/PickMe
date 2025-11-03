@@ -16,6 +16,7 @@ DEFAULT_UUID = "local"
 
 DEFAULT_PREFERENCES: dict[str, Any] = {
     "dismissed_intro_popup": False,
+    "dismissed_draw_mode_tooltip": False,
     "theme": "system",
     "language": "zh-CN",
 }
