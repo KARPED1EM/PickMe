@@ -33,6 +33,8 @@ const dom = {
     historyEmpty: document.querySelector("[data-history-empty]"),
     resultControlsShell: document.querySelector('.result-controls-shell'),
     unsupportedOverlay: $("unsupported-overlay"),
+    drawModeTooltip: $("draw-mode-tooltip"),
+    drawModeTooltipClose: null,
 };
 
 const DRAW_MODES = Object.freeze({
@@ -503,6 +505,7 @@ const preferenceStore = (() => {
         "theme",
         "language",
         "dismissed_intro_popup",
+        "dismissed_draw_mode_tooltip",
     ]);
 
     function readAll() {
@@ -2235,13 +2238,31 @@ function handlePickAction() {
     closeModeMenu();
     if (state.pickMode === DRAW_MODES.BATCH) {
         handleBatchPick();
+        // Show tooltip after first pick (non-blocking)
+        setTimeout(() => {
+            if (drawModeTooltip && typeof drawModeTooltip.show === 'function') {
+                drawModeTooltip.show();
+            }
+        }, 300);
         return;
     }
     if (state.pickMode === DRAW_MODES.GROUP) {
         handleRandom(DRAW_MODES.GROUP);
+        // Show tooltip after first pick (non-blocking)
+        setTimeout(() => {
+            if (drawModeTooltip && typeof drawModeTooltip.show === 'function') {
+                drawModeTooltip.show();
+            }
+        }, 300);
         return;
     }
     handleRandom(DRAW_MODES.SINGLE);
+    // Show tooltip after first pick (non-blocking)
+    setTimeout(() => {
+        if (drawModeTooltip && typeof drawModeTooltip.show === 'function') {
+            drawModeTooltip.show();
+        }
+    }, 300);
 }
 
 function handleBatchPick() {
@@ -2283,6 +2304,10 @@ function handleModeToggle(event) {
     if (state.isModeMenuOpen) {
         closeModeMenu();
     } else {
+        // Dismiss tooltip when mode menu is opened
+        if (drawModeTooltip && typeof drawModeTooltip.hide === 'function') {
+            drawModeTooltip.hide(true);
+        }
         openModeMenu();
     }
 }
@@ -4385,13 +4410,101 @@ if (dom.backToTop) {
     
     window.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('resize', handleScroll, { passive: true });
-    
+
     dom.backToTop.addEventListener('click', () => {
         window.scrollTo({
             top: 0,
             behavior: 'smooth'
         });
     });
+}
+
+// Draw Mode Tooltip Management
+const drawModeTooltip = (() => {
+    const PREFERENCE_KEY = "dismissed_draw_mode_tooltip";
+    let resizeHandler = null;
+
+    // Helper functions for persistence
+    async function hasBeenDismissed() {
+        return preferenceStore.get(PREFERENCE_KEY, false) === true;
+    }
+
+    async function markAsDismissed() {
+        await preferenceStore.set({ [PREFERENCE_KEY]: true });
+    }
+
+    // Position tooltip below the mode toggle button
+    function positionTooltip() {
+        if (!dom.drawModeTooltip || !dom.pickModeToggle) return;
+
+        const toggleRect = dom.pickModeToggle.getBoundingClientRect();
+        const tooltip = dom.drawModeTooltip;
+
+        // Position below the toggle button, centered horizontally
+        const leftPos = toggleRect.left + toggleRect.width / 2;
+        const topPos = toggleRect.bottom + 12;
+
+        tooltip.style.left = `${leftPos}px`;
+        tooltip.style.top = `${topPos}px`;
+        tooltip.style.right = 'auto';
+        tooltip.style.transform = 'translateX(-50%)';
+    }
+
+    // Show tooltip
+    async function show() {
+        const dismissed = await hasBeenDismissed();
+        if (dismissed || !dom.drawModeTooltip) return;
+
+        positionTooltip();
+        dom.drawModeTooltip.hidden = false;
+
+        // Reposition on window resize
+        if (!resizeHandler) {
+            resizeHandler = () => positionTooltip();
+            window.addEventListener('resize', resizeHandler);
+        }
+    }
+
+    // Hide tooltip
+    async function hide(shouldDismiss = false) {
+        if (!dom.drawModeTooltip) return;
+
+        dom.drawModeTooltip.hidden = true;
+
+        // Remove resize handler
+        if (resizeHandler) {
+            window.removeEventListener('resize', resizeHandler);
+            resizeHandler = null;
+        }
+
+        if (shouldDismiss) {
+            await markAsDismissed();
+        }
+    }
+
+    // Initialize close button event
+    function initCloseButton() {
+        if (!dom.drawModeTooltip) return;
+
+        dom.drawModeTooltipClose = dom.drawModeTooltip.querySelector('.draw-mode-tooltip-close');
+
+        if (dom.drawModeTooltipClose) {
+            dom.drawModeTooltipClose.addEventListener('click', () => {
+                hide(true);
+            });
+        }
+    }
+
+    return {
+        show,
+        hide,
+        initCloseButton,
+        hasBeenDismissed,
+    };
+})();
+
+function initDrawModeTooltip() {
+    drawModeTooltip.initCloseButton();
 }
 
 function initFirstVisitPopup() {
@@ -4479,4 +4592,5 @@ function initFirstVisitPopup() {
 
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(initFirstVisitPopup, 500);
+    initDrawModeTooltip();
 });

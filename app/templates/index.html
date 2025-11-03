@@ -171,6 +171,21 @@
 
 <div id="context-menu" class="context-menu d-none"></div>
 <div id="modal-root" class="modal-root d-none"></div>
+
+<!-- Draw Mode Tooltip -->
+<div id="draw-mode-tooltip" class="draw-mode-tooltip" hidden>
+    <button class="draw-mode-tooltip-close" aria-label="关闭提示">
+        <svg viewBox="0 0 16 16" fill="none">
+            <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+    </button>
+    <div class="draw-mode-tooltip-content">
+        <div class="draw-mode-tooltip-icon">💡</div>
+        <p class="draw-mode-tooltip-text">点击这里可以选择不同的抽取模式哦~</p>
+    </div>
+    <div class="draw-mode-tooltip-arrow"></div>
+</div>
+
 <button id="back-to-top" class="back-to-top" aria-label="回到顶部">
     <svg viewBox="0 0 16 16" fill="none">
         <path d="M8 4l-6 6h12L8 4z" fill="currentColor"/>

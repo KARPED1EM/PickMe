@@ -625,6 +625,7 @@ def create_app(
             "theme",
             "language",
             "dismissed_intro_popup",
+            "dismissed_draw_mode_tooltip",
         }
         for key in prefs.keys():
             if key not in allowed_keys:
