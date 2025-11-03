@@ -1466,17 +1466,17 @@ body.modal-open { overflow: hidden; }
     height: 12px;
     background: rgba(28, 32, 52, 0.96);
     border: 1px solid rgba(255, 255, 255, 0.16);
-    border-left: none;
     border-bottom: none;
+    border-right: none;
     transform: rotate(45deg);
-    box-shadow: 2px -2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: -2px -2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* Arrow pointing left (default) */
+/* Arrow pointing up (at top center) */
 .draw-mode-tooltip-arrow {
-    right: -6px;
-    top: 50%;
-    margin-top: -6px;
+    left: 50%;
+    top: -6px;
+    margin-left: -6px;
 }
 
 @media (max-width: 768px) {

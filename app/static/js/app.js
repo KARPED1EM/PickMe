@@ -4433,20 +4433,21 @@ const drawModeTooltip = (() => {
         await preferenceStore.set({ [PREFERENCE_KEY]: true });
     }
 
-    // Position tooltip next to the mode toggle button
+    // Position tooltip below the mode toggle button
     function positionTooltip() {
         if (!dom.drawModeTooltip || !dom.pickModeToggle) return;
 
         const toggleRect = dom.pickModeToggle.getBoundingClientRect();
         const tooltip = dom.drawModeTooltip;
 
-        // Position to the left of the toggle button
-        const rightPos = window.innerWidth - toggleRect.left + 12;
-        const topPos = toggleRect.top + toggleRect.height / 2;
+        // Position below the toggle button, centered horizontally
+        const leftPos = toggleRect.left + toggleRect.width / 2;
+        const topPos = toggleRect.bottom + 12;
 
-        tooltip.style.right = `${rightPos}px`;
+        tooltip.style.left = `${leftPos}px`;
         tooltip.style.top = `${topPos}px`;
-        tooltip.style.transform = 'translateY(-50%)';
+        tooltip.style.right = 'auto';
+        tooltip.style.transform = 'translateX(-50%)';
     }
 
     // Show tooltip
