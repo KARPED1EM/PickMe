@@ -1373,6 +1373,7 @@ function buildSettingsModal() {
           <div class="settings-actions-row">
             <button id="settings-export" type="button" class="btn btn-outline-light settings-action">导出数据</button>
             <button id="settings-import" type="button" class="btn btn-outline-light settings-action">导入数据</button>
+            ${!APP_RUNNING_ON_DESKTOP ? '<button id="settings-migrate" type="button" class="btn btn-outline-light settings-action">迁移数据</button>' : ''}
           </div>
           <input id="settings-import-input" type="file" accept="application/json,.json" class="d-none">
         </section>
@@ -1406,6 +1407,10 @@ function openSettingsModal() {
             importInput.click();
         });
         importInput.addEventListener("change", handleSettingsImportSelect);
+    }
+    const migrateButton = dom.modalRoot.querySelector("#settings-migrate");
+    if (migrateButton && !APP_RUNNING_ON_DESKTOP) {
+        migrateButton.addEventListener("click", openMigrateModal);
     }
     const secretContainers = dom.modalRoot.querySelectorAll("[data-secret-container]");
     secretContainers.forEach(container => {
@@ -3343,6 +3348,135 @@ async function submitImportPayload(payload) {
     }
     if (body) {
         applyServerState(body);
+    }
+}
+
+function buildMigrateModal() {
+    return `
+<div class="modal-backdrop">
+  <div class="modal-panel glass">
+    <div class="modal-header">
+      <h3 class="modal-title">迁移数据</h3>
+      <button type="button" class="btn btn-icon" data-modal-close aria-label="关闭">×</button>
+    </div>
+    <form id="migrate-form">
+      <div class="modal-body slim-scroll">
+        <p class="settings-description">请输入目标 UID，数据将从当前账户迁移到目标账户。迁移后页面会自动刷新并加载目标账户的数据。</p>
+        <div class="mb-3">
+          <label for="migrate-uid-input" class="form-label">目标 UID</label>
+          <input id="migrate-uid-input" name="new_uid" type="text" class="form-control" placeholder="输入目标 UID（大小写不敏感）" autocomplete="off" required>
+          <small class="text-muted">请确保输入的 UID 是已存在的账户</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-light" data-modal-close>取消</button>
+        <button type="submit" class="btn btn-accent">确认迁移</button>
+      </div>
+    </form>
+  </div>
+</div>`;
+}
+
+function openMigrateModal() {
+    if (state.busy || state.isAnimating) {
+        return;
+    }
+    if (APP_RUNNING_ON_DESKTOP) {
+        showToast("该功能仅在服务器模式下可用", "warning");
+        return;
+    }
+    const content = buildMigrateModal();
+    const backdrop = showModal(content);
+    if (!backdrop) {
+        return;
+    }
+    const form = dom.modalRoot.querySelector("#migrate-form");
+    const input = dom.modalRoot.querySelector("#migrate-uid-input");
+    const closers = dom.modalRoot.querySelectorAll("[data-modal-close]");
+    closers.forEach(button => button.addEventListener("click", () => closeModal(backdrop)));
+    if (form) {
+        form.addEventListener("submit", handleMigrateSubmit);
+    }
+    if (input) {
+        input.value = "";
+        input.focus();
+    }
+}
+
+async function handleMigrateSubmit(event) {
+    event.preventDefault();
+    if (state.busy) {
+        return;
+    }
+    const form = event.currentTarget;
+    const input = form.querySelector("[name='new_uid']");
+    const submitButton = form.querySelector("[type='submit']");
+
+    if (!input || !input.value.trim()) {
+        showToast("请输入目标 UID", "warning");
+        return;
+    }
+
+    const newUid = input.value.trim().toLowerCase();
+    const oldUid = sessionStore.uuid;
+
+    if (!oldUid) {
+        showToast("当前会话无效", "error");
+        return;
+    }
+
+    if (newUid === oldUid.toLowerCase()) {
+        showToast("目标 UID 不能与当前 UID 相同", "warning");
+        return;
+    }
+
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.classList.add("is-busy");
+    }
+
+    setBusy(true);
+
+    try {
+        const response = await fetch("/data/migrate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                old_uuid: oldUid,
+                new_uuid: newUid
+            })
+        });
+
+        let body = null;
+        try {
+            body = await response.json();
+        } catch {
+            body = null;
+        }
+
+        if (!response.ok) {
+            const message = body && body.message ? body.message : "迁移失败";
+            throw new Error(message);
+        }
+
+        // Migration successful, update localStorage and reload
+        if (body && body.new_uuid) {
+            sessionStore.saveUuid(body.new_uuid);
+            showToast("迁移成功，即将刷新页面", "success");
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            throw new Error("迁移响应数据异常");
+        }
+    } catch (error) {
+        const message = error && error.message ? error.message : "迁移失败，请稍后重试";
+        showToast(message, "error");
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.classList.remove("is-busy");
+        }
+        setBusy(false);
     }
 }
 

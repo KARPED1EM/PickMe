@@ -489,3 +489,40 @@ class UserDataStore:
                     temp_path.unlink()
                 except OSError:
                     pass
+
+    def migrate_user_data(self, old_user_id: str, new_user_id: str) -> None:
+        """Migrate user data from old_user_id to new_user_id.
+
+        This operation checks if the target user_id exists, and if so,
+        deletes the old user's data file. The frontend will then use
+        the new user_id to load data from the target account.
+
+        Args:
+            old_user_id: The current user_id to migrate from
+            new_user_id: The target user_id to migrate to
+
+        Raises:
+            ValueError: If new_user_id does not exist or old_user_id is invalid
+        """
+        with self._lock:
+            # Normalize both user IDs
+            old_normalized = _sanitize_uuid(old_user_id)
+            new_normalized = _sanitize_uuid(new_user_id)
+
+            if not old_normalized:
+                raise ValueError("Invalid old user ID")
+            if not new_normalized:
+                raise ValueError("Invalid new user ID")
+
+            # Check if the target user exists
+            new_path = self.resolve_path(new_normalized)
+            if not new_path.exists():
+                raise ValueError("Target user ID does not exist")
+
+            # Delete the old user's data file
+            old_path = self.resolve_path(old_normalized)
+            if old_path.exists():
+                try:
+                    old_path.unlink()
+                except OSError as e:
+                    raise ValueError(f"Failed to delete old user data: {e}") from e
