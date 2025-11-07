@@ -38,6 +38,9 @@ ERROR_TEXT = {
     "class_name_required": "班级名称不能为空",
     "class_order_invalid": "班级排序数据无效",
     "uuid_missing": "缺少用户标识",
+    "migrate_target_not_found": "目标 UID 不存在，请检查输入是否正确",
+    "migrate_missing_params": "缺少迁移参数",
+    "migrate_invalid_uuid": "无效的 UID 格式",
 }
 
 ActionHandler = Callable[[UserData, ClassroomsState, dict[str, Any]], JSONResponse]
@@ -571,6 +574,48 @@ def create_app(
                 "message": "导入成功",
             }
         )
+
+    @app.post("/data/migrate")
+    async def migrate_user(request: Request) -> JSONResponse:
+        """Migrate user data from old UID to new UID."""
+        # Only allow in server mode
+        if storage.mode != "server":
+            return error_response("该功能仅在服务器模式下可用", status=400)
+
+        data = await request_json(request)
+        if not data:
+            return error_response(translate_error("migrate_missing_params"), status=400)
+
+        old_uuid = data.get("old_uuid")
+        new_uuid = data.get("new_uuid")
+
+        if not old_uuid or not new_uuid:
+            return error_response(translate_error("migrate_missing_params"), status=400)
+
+        # Normalize and validate both UUIDs
+        try:
+            old_uuid_normalized = storage.normalize_user_id(old_uuid)
+            new_uuid_normalized = storage.normalize_user_id(new_uuid)
+        except ValueError:
+            return error_response(translate_error("migrate_invalid_uuid"), status=400)
+
+        # Perform the migration
+        try:
+            storage._store.migrate_user_data(old_uuid_normalized, new_uuid_normalized)
+            return JSONResponse(
+                {
+                    "success": True,
+                    "new_uuid": new_uuid_normalized,
+                    "message": "迁移成功",
+                }
+            )
+        except ValueError as e:
+            error_msg = str(e)
+            if "does not exist" in error_msg:
+                return error_response(
+                    translate_error("migrate_target_not_found"), status=400
+                )
+            return error_response(f"迁移失败: {error_msg}", status=400)
 
     @app.post("/actions")
     async def handle_action(request: Request) -> JSONResponse:
