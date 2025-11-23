@@ -1552,10 +1552,6 @@ body.modal-open { overflow: hidden; }
 .history-name-item.is-hovered,
 .result-name.is-text.is-hovered {
     color: rgba(78, 205, 255, 0.95);
-    text-decoration: underline;
-    text-decoration-color: rgba(78, 205, 255, 0.4);
-    text-decoration-thickness: 2px;
-    text-underline-offset: 2px;
 }
 
 .history-name-item {

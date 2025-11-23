@@ -4761,8 +4761,13 @@ function initStudentInfoTooltip() {
             tooltip.hidden = false;
 
             const tooltipRect = tooltip.getBoundingClientRect();
+            const targetRect = target.getBoundingClientRect();
             const viewportWidth = window.innerWidth;
             const viewportHeight = window.innerHeight;
+
+            const maxDistance = 250;
+            const targetCenterX = targetRect.left + targetRect.width / 2;
+            const targetCenterY = targetRect.top + targetRect.height / 2;
 
             let left = x + 12;
             let top = y + 12;
@@ -4774,8 +4779,23 @@ function initStudentInfoTooltip() {
                 top = y - tooltipRect.height - 12;
             }
 
-            tooltip.style.left = `${Math.max(8, left)}px`;
-            tooltip.style.top = `${Math.max(8, top)}px`;
+            const tooltipCenterX = left + tooltipRect.width / 2;
+            const tooltipCenterY = top + tooltipRect.height / 2;
+            const distance = Math.sqrt(
+                Math.pow(tooltipCenterX - targetCenterX, 2) +
+                Math.pow(tooltipCenterY - targetCenterY, 2)
+            );
+
+            if (distance > maxDistance) {
+                const angle = Math.atan2(tooltipCenterY - targetCenterY, tooltipCenterX - targetCenterX);
+                const constrainedX = targetCenterX + Math.cos(angle) * maxDistance;
+                const constrainedY = targetCenterY + Math.sin(angle) * maxDistance;
+                left = constrainedX - tooltipRect.width / 2;
+                top = constrainedY - tooltipRect.height / 2;
+            }
+
+            tooltip.style.left = `${Math.max(8, Math.min(viewportWidth - tooltipRect.width - 8, left))}px`;
+            tooltip.style.top = `${Math.max(8, Math.min(viewportHeight - tooltipRect.height - 8, top))}px`;
         }, 100);
     }
 
