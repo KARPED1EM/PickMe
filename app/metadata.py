@@ -14,7 +14,7 @@ __all__ = ["AppMetadata", "load_app_metadata"]
 @dataclass(frozen=True)
 class AppMetadata:
     name: str = "Pick Me"
-    version: str = "v2.3.1"
+    version: str = "v2.3.2"
     developer: str = "KARPED1EM"
     license: str = "MIT License"
     repository: str = "https://github.com/KARPED1EM/PickMe"
