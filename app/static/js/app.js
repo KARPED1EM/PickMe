@@ -4724,7 +4724,172 @@ function initFirstVisitPopup() {
     });
 }
 
+function initStudentInfoTooltip() {
+    const tooltip = $("student-info-tooltip");
+    if (!tooltip) return;
+
+    const nameEl = tooltip.querySelector(".student-info-tooltip-name");
+    const idEl = tooltip.querySelector(".student-info-tooltip-id");
+    const groupEl = tooltip.querySelector(".student-info-tooltip-group");
+
+    let showTimeout = null;
+    let currentTarget = null;
+
+    function hideTooltip() {
+        if (showTimeout) {
+            clearTimeout(showTimeout);
+            showTimeout = null;
+        }
+        tooltip.hidden = true;
+        if (currentTarget) {
+            currentTarget.classList.remove("is-hovered");
+            currentTarget = null;
+        }
+    }
+
+    function showTooltip(target, student, x, y) {
+        if (showTimeout) clearTimeout(showTimeout);
+
+        currentTarget = target;
+        target.classList.add("is-hovered");
+
+        nameEl.textContent = student.name;
+        idEl.textContent = student.id;
+        groupEl.textContent = String(student.group);
+
+        showTimeout = setTimeout(() => {
+            tooltip.hidden = false;
+
+            const tooltipRect = tooltip.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            let left = x + 12;
+            let top = y + 12;
+
+            if (left + tooltipRect.width > viewportWidth - 16) {
+                left = x - tooltipRect.width - 12;
+            }
+            if (top + tooltipRect.height > viewportHeight - 16) {
+                top = y - tooltipRect.height - 12;
+            }
+
+            tooltip.style.left = `${Math.max(8, left)}px`;
+            tooltip.style.top = `${Math.max(8, top)}px`;
+        }, 100);
+    }
+
+    function findStudentByName(name) {
+        if (!state.studentsMap) return null;
+        for (const student of state.studentsMap.values()) {
+            if (student.name === name) {
+                return student;
+            }
+        }
+        return null;
+    }
+
+    function handleResultNameHover(event) {
+        const target = event.target;
+        if (!target.classList.contains("result-name-item")) return;
+
+        const name = target.textContent.trim();
+        const student = findStudentByName(name);
+        if (!student) return;
+
+        showTooltip(target, student, event.clientX, event.clientY);
+    }
+
+    function handleResultNameLeave(event) {
+        if (event.target.classList.contains("result-name-item")) {
+            hideTooltip();
+        }
+    }
+
+    function wrapHistoryEntryNames() {
+        const entries = document.querySelectorAll(".history-entry-names");
+        entries.forEach(entryEl => {
+            if (entryEl.dataset.wrapped === "true") return;
+
+            const text = entryEl.textContent.trim();
+            if (!text || text === "--") return;
+
+            const names = text.split("、").map(n => n.trim()).filter(Boolean);
+            if (names.length === 0) return;
+
+            const fragment = document.createDocumentFragment();
+            names.forEach((name, index) => {
+                const span = document.createElement("span");
+                span.className = "history-name-item";
+                span.textContent = name;
+                span.style.cursor = "pointer";
+                fragment.appendChild(span);
+
+                if (index < names.length - 1) {
+                    fragment.appendChild(document.createTextNode("、"));
+                }
+            });
+
+            entryEl.innerHTML = "";
+            entryEl.appendChild(fragment);
+            entryEl.dataset.wrapped = "true";
+        });
+    }
+
+    function handleHistoryNameHover(event) {
+        const target = event.target;
+        if (!target.classList.contains("history-name-item")) return;
+
+        const name = target.textContent.trim();
+        const student = findStudentByName(name);
+        if (!student) return;
+
+        showTooltip(target, student, event.clientX, event.clientY);
+    }
+
+    function handleHistoryNameLeave(event) {
+        if (event.target.classList.contains("history-name-item")) {
+            hideTooltip();
+        }
+    }
+
+    const resultName = dom.resultName;
+    if (resultName) {
+        resultName.addEventListener("mouseover", handleResultNameHover);
+        resultName.addEventListener("mouseout", handleResultNameLeave);
+    }
+
+    const historyGroups = dom.historyGroups;
+    if (historyGroups) {
+        historyGroups.addEventListener("mouseover", handleHistoryNameHover);
+        historyGroups.addEventListener("mouseout", handleHistoryNameLeave);
+    }
+
+    const originalApplyHistory = window.applyHistory;
+    if (typeof originalApplyHistory === "function") {
+        window.applyHistory = function() {
+            const result = originalApplyHistory.apply(this, arguments);
+            setTimeout(wrapHistoryEntryNames, 0);
+            return result;
+        };
+    }
+
+    wrapHistoryEntryNames();
+
+    const observer = new MutationObserver(() => {
+        wrapHistoryEntryNames();
+    });
+
+    if (historyGroups) {
+        observer.observe(historyGroups, {
+            childList: true,
+            subtree: true
+        });
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(initFirstVisitPopup, 500);
     initDrawModeTooltip();
+    initStudentInfoTooltip();
 });
