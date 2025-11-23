@@ -1549,7 +1549,8 @@ body.modal-open { overflow: hidden; }
 }
 
 .result-name-item.is-hovered,
-.history-name-item.is-hovered {
+.history-name-item.is-hovered,
+.result-name.is-text.is-hovered {
     color: rgba(78, 205, 255, 0.95);
     text-decoration: underline;
     text-decoration-color: rgba(78, 205, 255, 0.4);
@@ -1558,5 +1559,10 @@ body.modal-open { overflow: hidden; }
 }
 
 .history-name-item {
+    transition: color 0.15s ease, text-decoration 0.15s ease;
+}
+
+.result-name.is-text {
+    cursor: pointer;
     transition: color 0.15s ease, text-decoration 0.15s ease;
 }

@@ -4791,17 +4791,28 @@ function initStudentInfoTooltip() {
 
     function handleResultNameHover(event) {
         const target = event.target;
-        if (!target.classList.contains("result-name-item")) return;
 
-        const name = target.textContent.trim();
-        const student = findStudentByName(name);
-        if (!student) return;
+        if (target.classList.contains("result-name-item")) {
+            const name = target.textContent.trim();
+            const student = findStudentByName(name);
+            if (!student) return;
+            showTooltip(target, student, event.clientX, event.clientY);
+            return;
+        }
 
-        showTooltip(target, student, event.clientX, event.clientY);
+        if (target.id === "result-name" && target.classList.contains("is-text")) {
+            const name = target.textContent.trim();
+            if (!name || name === "--") return;
+            const student = findStudentByName(name);
+            if (!student) return;
+            showTooltip(target, student, event.clientX, event.clientY);
+        }
     }
 
     function handleResultNameLeave(event) {
-        if (event.target.classList.contains("result-name-item")) {
+        const target = event.target;
+        if (target.classList.contains("result-name-item") ||
+            (target.id === "result-name" && target.classList.contains("is-text"))) {
             hideTooltip();
         }
     }
